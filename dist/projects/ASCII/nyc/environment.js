@@ -26,14 +26,35 @@
     return{x:xs.reduce((a,b)=>a+b)/4,y:ys.reduce((a,b)=>a+b)/4,w,h,
       color:rgb.map(v=>Math.round(v/peak*255)),power:Math.min(1,Math.sqrt(w*h)/150)*Math.sqrt(luminance)};
   }
+  // Dry paving receives diffuse color, not readable, striped copies of ads.
+  // Normalize overlapping sources and cap opacity so white campaigns cannot
+  // bleach the ground. Fade in over the pavement rather than clipping a polygon.
+  function groundLightAt(x,y,night,lamps){
+    const edge=648+Math.abs(x-640)*.065,t=clamp((y-edge)/90,0,1),fade=t*t*(3-2*t);
+    if(!night||!fade)return[0,0,0,0];
+    let weight=0,r=0,g=0,b=0;
+    for(const lamp of lamps){
+      const dx=(x-lamp.x)/(110+lamp.w*.7),dy=(y-(715+Math.abs(lamp.x-640)*.10))/(140+lamp.h*.2);
+      const w=lamp.power*.8*Math.exp(-2*(dx*dx+dy*dy));
+      weight+=w;r+=lamp.color[0]*w;g+=lamp.color[1]*w;b+=lamp.color[2]*w;
+    }
+    return weight?[r/weight,g/weight,b/weight,.26*night*fade*(1-Math.exp(-weight))]:[0,0,0,0];
+  }
+  let groundCanvas,groundContext,groundPixels;
   function paintBillboardGlow(g,l,screens,ground=false){
-    if(l.night<=0)return;g.save();g.globalCompositeOperation='screen';
-    if(ground){g.beginPath();g.moveTo(0,685);g.lineTo(530,640);g.lineTo(744,640);g.lineTo(1280,730);g.lineTo(1280,H);g.lineTo(0,H);g.closePath();g.clip()}
-    for(const screen of screens){
-      const lamp=screen.light;if(!lamp||lamp.power<.01)continue;
-      const x=lamp.x,y=ground?690+Math.abs(x-640)*.15:lamp.y;
-      const rx=ground?100+lamp.w*.7:40+lamp.w*.75,ry=ground?85+lamp.h*.22:35+lamp.h*.75;
-      const strength=l.night*lamp.power*(ground?.38:.32),c=lamp.color.join(',');
+    if(l.night<=0)return;
+    const lamps=screens.map(s=>s.light).filter(lamp=>lamp&&lamp.power>.01);
+    g.save();g.globalCompositeOperation='screen';
+    if(ground){
+      if(!groundCanvas){groundCanvas=document.createElement('canvas');groundCanvas.width=128;groundCanvas.height=86;groundContext=groundCanvas.getContext('2d');groundPixels=groundContext.createImageData(128,86)}
+      const data=groundPixels.data;
+      for(let y=0;y<86;y++)for(let x=0;x<128;x++){
+        const c=groundLightAt((x+.5)*W/128,(y+.5)*H/86,l.night,lamps),i=(y*128+x)*4;
+        data[i]=c[0];data[i+1]=c[1];data[i+2]=c[2];data[i+3]=Math.round(c[3]*255);
+      }
+      groundContext.putImageData(groundPixels,0,0);g.imageSmoothingEnabled=true;g.drawImage(groundCanvas,0,0,W,H);
+    }else for(const lamp of lamps){
+      const x=lamp.x,y=lamp.y,rx=40+lamp.w*.75,ry=35+lamp.h*.75,strength=l.night*lamp.power*.32,c=lamp.color.join(',');
       g.save();g.translate(x,y);g.scale(rx,ry);const halo=g.createRadialGradient(0,0,0,0,0,1);
       halo.addColorStop(0,`rgba(${c},${strength})`);halo.addColorStop(.35,`rgba(${c},${strength*.65})`);halo.addColorStop(1,`rgba(${c},0)`);
       g.fillStyle=halo;g.fillRect(-1,-1,2,2);g.restore();
@@ -75,10 +96,6 @@
   function nightLights(g,l,epoch,windows){
     for(const w of windows){const on=windowState(w.id,epoch,l)*l.night;if(on<.01)continue;g.globalAlpha=on*.87;g.shadowColor=`rgb(${w.color.join(',')})`;g.shadowBlur=4;g.drawImage(w.tile,w.x,w.y)}g.shadowBlur=0;g.globalAlpha=1;
   }
-  function paintReflections(g,l,screens){if(l.night<.05)return;g.save();g.beginPath();g.moveTo(0,706);g.lineTo(535,648);g.lineTo(740,650);g.lineTo(1280,756);g.lineTo(1280,854);g.lineTo(0,854);g.closePath();g.clip();
-    for(const [index,x,y,w,h]of [[3,100,700,220,180],[4,245,723,200,160],[16,575,647,115,220],[24,842,720,190,160],[28,1040,758,190,130]]){const screen=screens[index];if(!screen||screen.lastAd<0)continue;const stage=screen.stage;for(let row=0;row<36;row++){const t=row/36,width=w*(.30+.70*t),sy=(1-t)*Math.max(0,stage.height-7),sh=Math.min(7,stage.height-sy);g.globalAlpha=l.night*.25*Math.sin(Math.PI*t)*(.45+.55*rand(row+index));g.drawImage(stage,0,sy,stage.width,sh,x+(w-width)/2,y+t*h,width,h/36*.67)}}
-    g.globalAlpha=l.night*.12;for(let i=0;i<65;i++){g.fillStyle=i%3===0?'#ffc697':i%3===1?'#85d2f4':'#f69ace';g.fillRect(rand(i+44)*1280,678+rand(i+33)*176,12+rand(i+60)*70,1.5)}g.restore();
-  }
   function makeCanvas(){const c=document.createElement('canvas');c.width=W;c.height=H;return c}
   function create(day,roadPlate){
     const canvas=makeCanvas(),g=canvas.getContext('2d'),sky=makeCanvas(),s=sky.getContext('2d'),mask=makeCanvas(),m=mask.getContext('2d',{willReadFrequently:true});
@@ -100,5 +117,5 @@
     }
     return{canvas,render,skyPixels:tail,windowCount:windows.length};
   }
-  root.CityEnvironment={create,skyColor,sunColor,surfaceColor,billboardExposure,billboardLight,paintBillboardGlow,windowState,windowColor,paintReflections,palettes,setPalette};if(typeof module!=='undefined')module.exports=root.CityEnvironment;
+  root.CityEnvironment={create,skyColor,sunColor,surfaceColor,billboardExposure,billboardLight,paintBillboardGlow,windowState,windowColor,groundLightAt,palettes,setPalette};if(typeof module!=='undefined')module.exports=root.CityEnvironment;
 })(typeof window==='undefined'?globalThis:window);

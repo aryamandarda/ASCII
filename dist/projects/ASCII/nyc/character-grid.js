@@ -9,5 +9,11 @@
     return{color:q(r)*64+q(g)*8+q(b),glyph:Math.min(7,Math.floor(((.2126*r+.7152*g+.0722*b)/255)**.8*7))};
   }
   function size(columns){return{columns,rows:Math.round(columns*854/1280*.6)}}
-  root.CharacterGrid={palette,ramp,cell,size};if(typeof module!=='undefined')module.exports=root.CharacterGrid;
+  // Use the contained artwork size in CSS pixels, not the monitor resolution.
+  // Preserve the phone's 390 columns; add detail as the artwork grows on desktop.
+  function columnsForView(width,height){
+    const displayed=Math.min(Math.max(0,width),Math.max(0,height)*1280/854);
+    return Math.max(390,Math.min(960,Math.round(displayed/2/10)*10));
+  }
+  root.CharacterGrid={palette,ramp,cell,size,columnsForView};if(typeof module!=='undefined')module.exports=root.CharacterGrid;
 })(typeof window==='undefined'?globalThis:window);

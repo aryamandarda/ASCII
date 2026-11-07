@@ -46,6 +46,6 @@ The checks cover the character pipeline, calendar and daylight calculations, bil
 
 Created by [Aryaman Darda](https://github.com/aryamandarda).
 
-Inspired by [the interactive ASCII work at mlsimon.com](https://mlsimon.com/). Campaign artwork, photography, and SunCalc are credited in [Third-party notices](THIRD_PARTY_NOTICES.md).
+Campaign artwork, photography, and SunCalc are credited in [Third-party notices](THIRD_PARTY_NOTICES.md).
 
 This is an artistic simulation. Crowd and traffic levels are modeled; weather is illustrative. It is not a live camera or advertising feed.

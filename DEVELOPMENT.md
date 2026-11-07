@@ -18,6 +18,18 @@ node --test tests/*.test.cjs
 
 The checks cover pedestrian separation, seating clearance, vehicle spacing, time reversal, New York daylight and calendar transitions, character rendering, perspective transforms, and the source video clips.
 
+## Local visual review before a pull request
+
+Build a standalone, offline review file:
+
+```sh
+python3 scripts/build-local-preview.py
+```
+
+Open `.openai/Times-Square-Local-Test.html` in a browser. No server or package installation is needed. The file includes all scene images, campaign frames, JavaScript and CSS. Its Test scenes panel offers midday, sunset, 1:47 AM, 4 AM and midnight presets, plus a phone viewport. Resize the browser to check desktop granularity. Use Hide controls or H inside the artwork to toggle the scene controls.
+
+The preview is generated from current source, starts paused, and does not publish or create a pull request. Review the pavement, screen glow, crowd and menu behavior before proposing changes. Run `npm test` for automated coverage of adaptive detail, bounded diffuse illumination and control toggling alongside the existing scene regressions.
+
 ## Separate artwork and personal website repositories
 
 Keep this repository as the source of the artwork. The personal website can include it at build time and copy only `dist/projects/ASCII` into its own static output at `projects/ASCII`.

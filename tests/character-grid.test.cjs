@@ -11,14 +11,15 @@ assert(Math.abs(flowSum-220000)<24,'Estimated hourly flow must sum to the publis
 assert(life.trafficAt(17).count>life.trafficAt(4).count*10);assert(life.trafficAt(12).count>life.trafficAt(10).count);
 global.SunCalc=require('../dist/projects/ASCII/nyc/vendor/suncalc.js');global.CityCalendar=require('../dist/projects/ASCII/nyc/calendar.js');global.BillboardModel=model;const traffic=require('../dist/projects/ASCII/nyc/traffic.js');
 // Integration: fresh page advances on its own, no video autoplay or user gesture.
-const canvases=[],images=[];let nextFrame;
+const canvases=[],images=[],listeners={};let nextFrame,resizeCallback;
 class Context {constructor(){this.draws=[]}drawImage(...a){this.draws.push(a)}getImageData(x,y,w,h){return{data:new Uint8ClampedArray(w*h*4).fill(160)}}fillRect(){}fillText(){}beginPath(){}lineTo(){}moveTo(){}closePath(){}save(){}restore(){}clip(){}transform(){}setTransform(){}fill(){}stroke(){}ellipse(){}translate(){}scale(){}createLinearGradient(){return{addColorStop(){}}}createRadialGradient(){return{addColorStop(){}}}}
 function canvas(){const c={dataset:{},style:{setProperty(){}},width:0,height:0,context:new Context(),getContext(){return this.context}};canvases.push(c);return c}
 class ImageMock {constructor(){this.naturalWidth=240;this.naturalHeight=360;images.push(this)}}
-const elements={art:canvas(),ambient:canvas()};function element(id){return elements[id]||(elements[id]={style:{setProperty(){}},setAttribute(){},removeAttribute(){},focus(){}})}
+const elements={art:canvas(),ambient:canvas()};function element(id){return elements[id]||(elements[id]={style:{setProperty(){}},attributes:{},clientWidth:390,clientHeight:844,setAttribute(k,v){this.attributes[k]=v},removeAttribute(){},focus(){}})}
 const win={};vm.runInNewContext(fs.readFileSync('dist/projects/ASCII/nyc/motion-manifest.js','utf8'),{window:win});
-const sandbox={BillboardModel:model,AdDirector:director,CharacterGrid:grid,CityLife:life,CityTraffic:traffic,CityCalendar,Intl,Date,MotionManifest:win.MotionManifest,CityEnvironment:{setPalette(){},palettes:{},paintReflections(){},paintBillboardGlow(){},billboardExposure:()=>.85,billboardLight:()=>({power:1}),create(){return{render:hour=>({hour}),skyPixels:170000}}},Image:ImageMock,
- document:{hidden:false,querySelectorAll(){return[]},getElementById:element,addEventListener(){},createElement(tag){assert.equal(tag,'canvas','No hidden autoplay video dependency');return canvas()}},
+const sandbox={BillboardModel:model,AdDirector:director,CharacterGrid:grid,CityLife:life,CityTraffic:traffic,CityCalendar,Intl,Date,MotionManifest:win.MotionManifest,CityEnvironment:{setPalette(){},palettes:{},paintBillboardGlow(){},billboardExposure:()=>.85,billboardLight:()=>({power:1}),create(){return{render:hour=>({hour}),skyPixels:170000}}},Image:ImageMock,
+ document:{hidden:false,querySelectorAll(){return[]},getElementById:element,addEventListener(name,fn){listeners[name]=fn},createElement(tag){assert.equal(tag,'canvas','No hidden autoplay video dependency');return canvas()}},
+ ResizeObserver:class{constructor(fn){resizeCallback=fn}observe(){}},
  matchMedia:()=>({matches:false}),performance:{now:()=>0},requestAnimationFrame(fn){nextFrame=fn},setTimeout(fn){fn()},clearTimeout(){}};
 (async()=>{
  vm.runInNewContext(fs.readFileSync('dist/projects/ASCII/nyc/fixed-screens.js','utf8'),sandbox);
@@ -41,5 +42,15 @@ const sandbox={BillboardModel:model,AdDirector:director,CharacterGrid:grid,CityL
  elements.reverse.onclick();elements.time.value='1439';elements.time.oninput();elements.date.value='2026-12-31';elements.date.onchange();
  nextFrame(3260);nextFrame(4260);assert.equal(out.dataset.date,'2027-01-01');
 
- console.log('PASS: startup without user gesture; frame sequences; pause/resume; fixed 390-column rendering; hourly crowd, exact clock, reverse and calendar rollover; ten creatives and grouped takeovers.');
+ const savedEpoch=out.dataset.epoch;
+ elements.surface.clientWidth=1440;elements.surface.clientHeight=900;resizeCallback();
+ assert(+out.dataset.columns>=670,'Desktop must render finer characters');assert.equal(out.dataset.epoch,savedEpoch,'Resize must not reset time');
+ elements.surface.clientWidth=390;elements.surface.clientHeight=844;resizeCallback();assert.equal(+out.dataset.columns,390);
+ vm.runInNewContext('showControls(false)',sandbox);assert(elements.controls.hidden&&elements.leave.hidden);assert.equal(elements.controlsToggle.attributes['aria-label'],'Show controls');
+ elements.controlsToggle.onclick();assert.equal(elements.controls.hidden,false);assert.equal(elements.controlsToggle.attributes['aria-label'],'Hide controls');
+ vm.runInNewContext('immersed=true',sandbox);sandbox.document.activeElement={tagName:'BUTTON'};
+ listeners.keydown({key:'h',code:'KeyH',preventDefault(){}});assert(elements.controls.hidden,'H works after clicking a button');
+ listeners.keydown({key:'H',code:'KeyH',preventDefault(){}});assert(!elements.controls.hidden,'H restores controls');
+ sandbox.document.activeElement={tagName:'INPUT'};listeners.keydown({key:'h',code:'KeyH',preventDefault(){}});assert(!elements.controls.hidden,'Do not toggle while editing');
+ console.log('PASS: startup without user gesture; frame sequences; pause/resume; responsive rendering and hide/show controls; hourly crowd, exact clock, reverse and calendar rollover; ten creatives and grouped takeovers.');
 })().catch(e=>{console.error(e);process.exitCode=1});
