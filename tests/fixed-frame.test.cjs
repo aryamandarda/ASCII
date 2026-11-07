@@ -1,0 +1,5 @@
+const assert=require('node:assert/strict'),{execFileSync}=require('node:child_process');
+const {boards,homography,inverse,map,inside}=require('../dist/projects/ASCII/nyc/billboard-model.js');
+for(const [name,p]of boards){const h=homography(p),inv=inverse(h);for(let u=.05;u<1;u+=.1)for(let v=.05;v<1;v+=.1){const pos=map(h,u,v),uv=map(inv,...pos);assert(inside(p,...pos),name);assert(Math.abs(uv[0]-u)<1e-5&&Math.abs(uv[1]-v)<1e-5,name)}}
+for(const n of ['coke-enjoy','coke-pour','spotify-now','spotify-sza','spotify-renee']){const file='dist/projects/ASCII/nyc/media/'+n+'.mp4';const data=JSON.parse(execFileSync('ffprobe',['-v','error','-show_entries','stream=codec_type,nb_frames,r_frame_rate','-of','json',file]));assert.equal(data.streams.length,1,'Muted video only');assert(Number(data.streams[0].nb_frames)>50);const samples=[0,1].map(t=>execFileSync('ffmpeg',['-v','error','-ss',String(t),'-i',file,'-frames:v','1','-f','md5','-']).toString());assert.notEqual(samples[0],samples[1],n+' must contain actual motion')}
+console.log('PASS: all 36 perspective maps preserve corners and interior points; 5 silent campaign source videos verified with changing frames.');

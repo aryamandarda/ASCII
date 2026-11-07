@@ -2,8 +2,6 @@
 
 Interactive city portraits, rendered in characters.
 
-![Times Square in ASCII](nyc/docs/preview.jpg)
-
 ## NYC
 
 Times Square as a living character canvas. Neon billboards trade places, the sky follows a New York calendar, and pedestrians and traffic move through a fixed street-level view.
@@ -21,10 +19,10 @@ Built with vanilla JavaScript and Canvas 2D. No framework, backend, API keys, or
 ```sh
 git clone https://github.com/aryamandarda/ASCII.git
 cd ASCII
-python3 -m http.server 8000
+python3 -m http.server 8000 --directory dist
 ```
 
-Open [localhost:8000/nyc/](http://localhost:8000/nyc/) in a modern browser. Serve the files over HTTP rather than opening `index.html` directly.
+Open [localhost:8000/projects/ASCII/nyc/](http://localhost:8000/projects/ASCII/nyc/) in a modern browser. Serve the files over HTTP rather than opening `index.html` directly.
 
 ## Explore
 
@@ -34,9 +32,9 @@ Speeds range from **0.5× to 5×**. At 1×, five simulated minutes pass in five 
 
 ## Development
 
-The complete scene lives in [`nyc/`](nyc/). Its [technical notes](nyc/README.md) describe the renderer and simulation.
+The complete scene lives in [`dist/projects/ASCII/nyc/`](dist/projects/ASCII/nyc/). Its [artwork notes](dist/projects/ASCII/nyc/art-notes.md) describe the renderer and simulation. See [development and website integration](DEVELOPMENT.md) for running the artwork alongside the separate personal website.
 
-Run the regression checks with Node.js 20 or later:
+Run the regression checks with Node.js 20 or later and FFmpeg installed:
 
 ```sh
 npm test

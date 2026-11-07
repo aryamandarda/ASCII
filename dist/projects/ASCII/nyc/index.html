@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+<base href="/projects/ASCII/nyc/">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Times Square</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main id="experience">
+  <canvas id="ambient" aria-hidden="true" width="120" height="80"></canvas>
+  <div id="surface"><canvas id="art" role="img" aria-label="Animated ASCII Times Square"></canvas></div>
+  <div class="veil" aria-hidden="true"></div>
+  <button id="immerse" class="glass enter" disabled><span>Immerse</span></button>
+  <span id="loading" role="status" aria-label="Loading artwork"></span>
+  <button id="leave" class="glass icon" aria-label="Leave immersive view" title="Leave immersive view" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17"/></svg></button>
+  <section id="controls" class="glass controls" aria-label="Scene controls" hidden>
+    <div id="skyOptions" class="glass sky-options" role="group" aria-label="Twilight palette" hidden><button data-sky="gold" aria-pressed="false"><i class="swatch gold"></i>Gold</button><button data-sky="coral" aria-pressed="true"><i class="swatch coral"></i>Coral</button><button data-sky="rose" aria-pressed="false"><i class="swatch rose"></i>Rose</button><button data-sky="violet" aria-pressed="false"><i class="swatch violet"></i>Violet</button></div><div class="clock-row">
+      <label class="calendar-control"><span id="dateValue"></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 10 3 3 3-3"/></svg><input id="date" type="date" aria-label="Calendar date in New York"></label>
+      <button id="sky" class="icon sky-toggle" aria-label="Choose sunrise and sunset colors" aria-expanded="false" title="Twilight palette"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17h18M6 14a6 6 0 0 1 12 0M12 3v2M4 7l2 2m14-2-2 2M5 21h14"/></svg></button><output id="timeValue" for="time"></output>
+    </div>
+    <input id="time" type="range" min="0" max="1439" step="1" aria-label="Time of day in New York">
+    <div class="transport">
+      <div class="speeds" role="group" aria-label="Animation speed"><button data-speed="0.5" aria-pressed="false" aria-label="Half speed">0.5×</button><button data-speed="1" aria-pressed="true" aria-label="Normal speed">1×</button><button data-speed="2" aria-pressed="false" aria-label="Double speed">2×</button><button data-speed="3" aria-pressed="false" aria-label="Triple speed">3×</button><button data-speed="5" aria-pressed="false" aria-label="Five times speed">5×</button></div>
+      <div class="playback">
+        <button id="reverse" class="icon" aria-pressed="false" aria-label="Reverse playback" title="Reverse playback"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m11 7-6 5 6 5V7Zm8 0-6 5 6 5V7Z"/></svg></button>
+        <button id="play" class="icon primary" aria-label="Pause animation" title="Pause animation"><svg id="pauseIcon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6v12M15 6v12"/></svg><svg id="playIcon" viewBox="0 0 24 24" aria-hidden="true" hidden><path d="m9 5 10 7-10 7V5Z"/></svg></button>
+      </div>
+    </div>
+  </section>
+</main>
+<script src="vendor/suncalc.js"></script>
+<script src="calendar.js"></script>
+<script src="billboard-model.js"></script>
+<script src="ad-director.js"></script>
+<script src="character-grid.js"></script>
+<script src="motion-manifest.js"></script>
+<script src="city-life.js"></script>
+<script src="traffic.js"></script>
+<script src="environment.js"></script>
+<script src="fixed-screens.js"></script>
+</body>
+</html>
