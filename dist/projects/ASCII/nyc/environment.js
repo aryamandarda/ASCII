@@ -19,6 +19,26 @@
   function srgbToLinear(v){v/=255;return v<=.04045?v/12.92:((v+.055)/1.055)**2.4}
   function linearToSrgb(v){return Math.round(255*(v<=.0031308?12.92*v:1.055*v**(1/2.4)-.055))}
   function surfaceColor(rgb,light){const l=light,exposure=.32+.68*l.day,tint=[.88+.12*l.day,.94+.06*l.day,1];return rgb.map((v,i)=>linearToSrgb(srgbToLinear(v)*exposure*tint[i]))}
+  const billboardExposure=light=>.85*light.night;
+  function billboardLight(points,rgb){
+    const xs=points.map(p=>p[0]),ys=points.map(p=>p[1]),w=Math.max(...xs)-Math.min(...xs),h=Math.max(...ys)-Math.min(...ys);
+    const peak=Math.max(...rgb,1),luminance=(rgb[0]*.2126+rgb[1]*.7152+rgb[2]*.0722)/255;
+    return{x:xs.reduce((a,b)=>a+b)/4,y:ys.reduce((a,b)=>a+b)/4,w,h,
+      color:rgb.map(v=>Math.round(v/peak*255)),power:Math.min(1,Math.sqrt(w*h)/150)*Math.sqrt(luminance)};
+  }
+  function paintBillboardGlow(g,l,screens,ground=false){
+    if(l.night<=0)return;g.save();g.globalCompositeOperation='screen';
+    if(ground){g.beginPath();g.moveTo(0,685);g.lineTo(530,640);g.lineTo(744,640);g.lineTo(1280,730);g.lineTo(1280,H);g.lineTo(0,H);g.closePath();g.clip()}
+    for(const screen of screens){
+      const lamp=screen.light;if(!lamp||lamp.power<.01)continue;
+      const x=lamp.x,y=ground?690+Math.abs(x-640)*.15:lamp.y;
+      const rx=ground?100+lamp.w*.7:40+lamp.w*.75,ry=ground?85+lamp.h*.22:35+lamp.h*.75;
+      const strength=l.night*lamp.power*(ground?.38:.32),c=lamp.color.join(',');
+      g.save();g.translate(x,y);g.scale(rx,ry);const halo=g.createRadialGradient(0,0,0,0,0,1);
+      halo.addColorStop(0,`rgba(${c},${strength})`);halo.addColorStop(.35,`rgba(${c},${strength*.65})`);halo.addColorStop(1,`rgba(${c},0)`);
+      g.fillStyle=halo;g.fillRect(-1,-1,2,2);g.restore();
+    }g.restore();
+  }
   const rand=n=>{const k=Math.sin(n*32.17)*43758.5;return k-Math.floor(k)};
   function windowState(id,epoch,l){
     const date=l.hour<12?CityCalendar.shiftDate(l.date,-1):l.date,e=CityCalendar.events(date),next=CityCalendar.events(CityCalendar.shiftDate(date,1)),night=Math.floor(+e.sunset/86400000),seed=id*31+night*7;
@@ -54,8 +74,6 @@
   }
   function nightLights(g,l,epoch,windows){
     for(const w of windows){const on=windowState(w.id,epoch,l)*l.night;if(on<.01)continue;g.globalAlpha=on*.87;g.shadowColor=`rgb(${w.color.join(',')})`;g.shadowBlur=4;g.drawImage(w.tile,w.x,w.y)}g.shadowBlur=0;g.globalAlpha=1;
-    if(l.night<.04)return;
-    for(const [x,y,rx,ry,c]of [[220,770,220,98,'255,116,110'],[617,754,130,130,'255,91,145'],[855,778,195,110,'55,184,245'],[1110,800,175,110,'241,120,194']]){g.save();g.translate(x,y);g.scale(rx,ry);const pool=g.createRadialGradient(0,0,0,0,0,1);pool.addColorStop(0,`rgba(${c},${l.night*.28})`);pool.addColorStop(1,`rgba(${c},0)`);g.fillStyle=pool;g.fillRect(-1,-1,2,2);g.restore()}
   }
   function paintReflections(g,l,screens){if(l.night<.05)return;g.save();g.beginPath();g.moveTo(0,706);g.lineTo(535,648);g.lineTo(740,650);g.lineTo(1280,756);g.lineTo(1280,854);g.lineTo(0,854);g.closePath();g.clip();
     for(const [index,x,y,w,h]of [[3,100,700,220,180],[4,245,723,200,160],[16,575,647,115,220],[24,842,720,190,160],[28,1040,758,190,130]]){const screen=screens[index];if(!screen||screen.lastAd<0)continue;const stage=screen.stage;for(let row=0;row<36;row++){const t=row/36,width=w*(.30+.70*t),sy=(1-t)*Math.max(0,stage.height-7),sh=Math.min(7,stage.height-sy);g.globalAlpha=l.night*.25*Math.sin(Math.PI*t)*(.45+.55*rand(row+index));g.drawImage(stage,0,sy,stage.width,sh,x+(w-width)/2,y+t*h,width,h/36*.67)}}
@@ -78,11 +96,9 @@
       const gradient=s.createLinearGradient(0,0,0,620);for(let i=0;i<=20;i++)gradient.addColorStop(i/20,`rgb(${skyColor(l,i/20).join(',')})`);s.fillStyle=gradient;s.fillRect(0,0,W,H);
       if(l.sun){s.fillStyle=`rgb(${sunColor(l).join(',')})`;s.beginPath();s.arc(l.x,l.y,18,0,Math.PI*2);s.fill()}
       if(l.moon){s.fillStyle='#f4edc8';s.beginPath();s.arc(l.moonX,l.moonY,15,0,Math.PI*2);s.fill();s.fillStyle=`rgb(${skyColor(l,l.moonY/620).join(',')})`;s.beginPath();s.arc(l.moonX+7,l.moonY-4,13,0,Math.PI*2);s.fill()}
-      // Atmospheric spill is local to the screens, and only visible at night.
-      if(l.night>.1){for(const [x,y,r,c]of [[630,475,115,'255,73,116'],[900,386,105,'76,187,255'],[370,420,90,'255,168,80']]){const halo=s.createRadialGradient(x,y,0,x,y,r);halo.addColorStop(0,`rgba(${c},${l.night*.10})`);halo.addColorStop(1,`rgba(${c},0)`);s.fillStyle=halo;s.fillRect(x-r,y-r,r*2,r*2)}}
       s.globalCompositeOperation='destination-in';s.drawImage(mask,0,0);s.globalCompositeOperation='source-over';g.drawImage(sky,0,0);nightLights(g,l,epoch,windows);return canvas;
     }
     return{canvas,render,skyPixels:tail,windowCount:windows.length};
   }
-  root.CityEnvironment={create,skyColor,sunColor,surfaceColor,windowState,windowColor,paintReflections,palettes,setPalette};if(typeof module!=='undefined')module.exports=root.CityEnvironment;
+  root.CityEnvironment={create,skyColor,sunColor,surfaceColor,billboardExposure,billboardLight,paintBillboardGlow,windowState,windowColor,paintReflections,palettes,setPalette};if(typeof module!=='undefined')module.exports=root.CityEnvironment;
 })(typeof window==='undefined'?globalThis:window);
