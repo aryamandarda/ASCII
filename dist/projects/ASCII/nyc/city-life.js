@@ -64,7 +64,9 @@
   const navigation=new Map();
   function navigate(route,ownTable){
     const key=ownTable===undefined?-1:ownTable,obs=obstacles.filter(o=>o.id!==ownTable),margin=o=>o.radius+.31,orbit=o=>(margin(o)+.05)/Math.cos(Math.PI/12);
-    const visible=(a,b)=>obs.every(o=>segmentDistance(a,b,o.p)>margin(o)-.001)&&inPlaza([(a[0]+b[0])/2,(a[1]+b[1])/2]);
+    // A walker may be inside the planning cushion after yielding to someone.
+    // Let it move outward, while never cutting closer to the physical obstacle.
+    const visible=(a,b)=>obs.every(o=>segmentDistance(a,b,o.p)>Math.min(margin(o),distance(a,o.p),distance(b,o.p))-.001)&&inPlaza([(a[0]+b[0])/2,(a[1]+b[1])/2]);
     if(!navigation.has(key)){
       const nodes=obs.flatMap(o=>Array.from({length:12},(_,i)=>[o.p[0]+Math.cos(i*Math.PI/6)*orbit(o),o.p[1]+Math.sin(i*Math.PI/6)*orbit(o)])).filter(p=>inPlaza(p)&&obs.every(o=>distance(p,o.p)>margin(o)));
       const edges=nodes.map((a,i)=>nodes.flatMap((b,j)=>i!==j&&visible(a,b)?[[j,distance(a,b)]]:[]));navigation.set(key,{nodes,edges});
@@ -72,7 +74,12 @@
     const {nodes,edges}=navigation.get(key),planned=[route.p[0]];
     for(let i=1;i<route.p.length;i++){
       let end=[...route.p[i]];
-      for(const o of obs){const d=distance(end,o.p);if(d<orbit(o)){const a=Math.atan2(end[1]-o.p[1],end[0]-o.p[0]);end=[o.p[0]+Math.cos(a)*(orbit(o)+.02),o.p[1]+Math.sin(a)*(orbit(o)+.02)]}}
+      // Moving a waypoint out of one table's clearance can put it inside its
+      // neighbor. Choose from nodes already checked against EVERY obstacle.
+      if(!inPlaza(end)||obs.some(o=>distance(end,o.p)<margin(o))){
+        const nearest=nodes.reduce((best,p)=>!best||distance(p,end)<distance(best,end)?p:best,null);
+        if(!nearest)continue;end=[...nearest];
+      }
       const start=planned[planned.length-1];
       if(visible(start,end)){planned.push(end);continue}
       const all=[...nodes,start,end],n=all.length,cost=Array(n).fill(Infinity),prev=Array(n).fill(-1),seen=new Set();cost[n-2]=0;
@@ -82,7 +89,9 @@
         const links=u<nodes.length?[...edges[u],...(visible(all[u],end)?[[n-1,distance(all[u],end)]]:[])]:all.flatMap((b,j)=>u!==j&&visible(all[u],b)?[[j,distance(all[u],b)]]:[]);
         for(const [v,d]of links)if(cost[u]+d<cost[v]){cost[v]=cost[u]+d;prev[v]=u}
       }
-      const detour=[];let u=n-1;while(prev[u]>=0){detour.unshift(all[u]);u=prev[u]}planned.push(...(detour.length?detour:[end]));
+      const detour=[];let u=n-1;while(prev[u]>=0){detour.unshift(all[u]);u=prev[u]}
+      // An unreachable intermediate point must never become a walking target.
+      if(u===n-2)planned.push(...detour);
     }
     return groundPath(planned);
   }
@@ -96,7 +105,7 @@
     const visits=seed?[...seed.visits]:Array.from({length:seats.length},(_,seat)=>Math.floor((begin+seat*41)/430)-1);
     if(seed)frames.push(agents.map(snapshot));
     const save=()=>({agents:agents.map(copyAgent),pending:[...pending],slot,visits:[...visits]});
-    function queue(spec){if(spec)pending.push(spec)}
+    function queue(spec){if(spec&&spec.route.p.length>1)pending.push(spec)}
     for(let tick=seed?1:0;tick<=(BLOCK+start-begin)/STEP;tick++){
       const t=begin+tick*STEP;
       const comfort=1.08;
@@ -124,6 +133,15 @@
         if(gap<.085&&a.waypoint===a.route.p.length-1){
           if(a.kind==='visit'&&!a.departing){a.sitStart=t;a.vx=a.vz=0;continue}
           a.done=true;continue;
+        }
+        // Detect lack of progress, including pacing in place, rather than only
+        // zero velocity. Replan a clear route without teleporting the walker.
+        if(a.progressAt===undefined||a.progressWaypoint!==a.waypoint||gap<a.progressGap-.25){
+          a.progressAt=t;a.progressWaypoint=a.waypoint;a.progressGap=gap;
+        }else if(t-a.progressAt>18+random(a.id)*8){
+          const replanned=navigate(groundPath([[...a.pos],a.route.p[a.route.p.length-1]]),a.tableId);
+          if(replanned.p.length>1){a.route=replanned;a.waypoint=1;a.progressAt=undefined}else a.progressAt=t;
+          continue;
         }
         const fx=(target[0]-a.pos[0])/gap,fz=(target[1]-a.pos[1])/gap;
         const pace=.80+.12*Math.sin(t/a.paceInterval*Math.PI*2+a.phase),weave=Math.sin(t/(a.paceInterval*.73)+a.phase)*.065;

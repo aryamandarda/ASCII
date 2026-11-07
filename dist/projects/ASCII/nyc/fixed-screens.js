@@ -2,6 +2,7 @@ const el=id=>document.getElementById(id),canvas=el('art'),output=canvas.getConte
 const {boards,homography,map}=BillboardModel,{adAt,sceneAt,names}=AdDirector;
 const world=document.createElement('canvas');world.width=1280;world.height=854;const ctx=world.getContext('2d',{alpha:false});
 const sample=document.createElement('canvas'),sc=sample.getContext('2d',{willReadFrequently:true});
+const lightSample=document.createElement('canvas');lightSample.width=lightSample.height=8;const lightContext=lightSample.getContext('2d',{willReadFrequently:true});
 const {palette,ramp,cell,size}=CharacterGrid;
 const atlas=document.createElement('canvas');atlas.width=palette.length*6;atlas.height=8*10;
 const ag=atlas.getContext('2d');ag.font='bold 10px monospace';ag.textAlign='center';ag.textBaseline='middle';
@@ -18,7 +19,7 @@ function path(points){ctx.beginPath();points.forEach((p,i)=>i?ctx.lineTo(...p):c
 function project(screen){const img=screen.stage;for(const {uv,dst}of screen.triangles){const s=uv.map(p=>[p[0]*img.width,p[1]*img.height]);const [[x0,y0],[x1,y1],[x2,y2]]=s,[[a0,b0],[a1,b1],[a2,b2]]=dst,den=x0*(y1-y2)+x1*(y2-y0)+x2*(y0-y1);const a=(a0*(y1-y2)+a1*(y2-y0)+a2*(y0-y1))/den,b=(b0*(y1-y2)+b1*(y2-y0)+b2*(y0-y1))/den,c=(a0*(x2-x1)+a1*(x0-x2)+a2*(x1-x0))/den,d=(b0*(x2-x1)+b1*(x0-x2)+b2*(x1-x0))/den,e=(a0*(x1*y2-x2*y1)+a1*(x2*y0-x0*y2)+a2*(x0*y1-x1*y0))/den,f=(b0*(x1*y2-x2*y1)+b1*(x2*y0-x0*y2)+b2*(x0*y1-x1*y0))/den;
 ctx.save();const center=[(a0+a1+a2)/3,(b0+b1+b2)/3];path(dst.map(p=>[p[0]+(p[0]-center[0])*.006,p[1]+(p[1]-center[1])*.006]));ctx.clip();ctx.transform(a,b,c,d,e,f);ctx.drawImage(img,0,0);ctx.restore()}}
 function noise(n){const k=Math.sin(n*127.1+31.7)*43758.5453;return k-Math.floor(k)}
-function screenAd(screen,ad,state){const {g,stage,index}=screen;if(screen.lastAd!==state.ad){screen.lastAd=state.ad;screen.changed=time}g.fillStyle=ad.color;g.fillRect(0,0,stage.width,stage.height);g.imageSmoothingEnabled=true;g.imageSmoothingQuality='high';const fit=Math.max(stage.width/ad.w,stage.height/ad.h),w=ad.w*fit,h=ad.h*fit;const frame=ad.frames?((Math.floor(time*ad.fps)%ad.frames)+ad.frames)%ad.frames:0;
+function screenAd(screen,ad,state,light){const {g,stage,index}=screen;if(screen.lastAd!==state.ad){screen.lastAd=state.ad;screen.changed=time}g.fillStyle=ad.color;g.fillRect(0,0,stage.width,stage.height);g.imageSmoothingEnabled=true;g.imageSmoothingQuality='high';const fit=Math.max(stage.width/ad.w,stage.height/ad.h),w=ad.w*fit,h=ad.h*fit;const frame=ad.frames?((Math.floor(time*ad.fps)%ad.frames)+ad.frames)%ad.frames:0;
 if(ad.frames){g.drawImage(ad.media,(frame%ad.columns)*ad.w,Math.floor(frame/ad.columns)*ad.h,ad.w,ad.h,Math.round((stage.width-w)/2),Math.round((stage.height-h)/2),Math.round(w),Math.round(h))}else g.drawImage(ad.media,Math.round((stage.width-w)/2),Math.round((stage.height-h)/2),Math.round(w),Math.round(h));
 
 // Ribbon displays use a legible wordmark instead of shrinking a full poster
@@ -29,17 +30,26 @@ if(screen.aspect>3){
   g.font=`bold ${Math.round(stage.height*.65)}px monospace`;g.textAlign='center';g.textBaseline='middle';g.fillText(label,stage.width/2,stage.height*.52,stage.width*.94);
 }
 // A couple of coarse static ticks on ad changes, never a dissolve or a smooth wipe.
-const change=adAt(index,time-1/6).ad!==state.ad||adAt(index,time+1/6).ad!==state.ad,tick=Math.floor(time*6);if(change||((tick+index*11)%97===0)){g.globalAlpha=change?.18:.075;g.fillStyle='#dce5d0';for(let n=0;n<(change?12:4);n++){const x=Math.floor(noise(n+tick*7+index)*stage.width/6)*6,y=Math.floor(noise(n+index*13+tick*3)*stage.height/8)*8;g.fillRect(x,y,6+Math.floor(noise(n+index)*3)*6,3)}g.globalAlpha=1}project(screen)}
+const change=adAt(index,time-1/6).ad!==state.ad||adAt(index,time+1/6).ad!==state.ad,tick=Math.floor(time*6);if(change||((tick+index*11)%97===0)){g.globalAlpha=change?.18:.075;g.fillStyle='#dce5d0';for(let n=0;n<(change?12:4);n++){const x=Math.floor(noise(n+tick*7+index)*stage.width/6)*6,y=Math.floor(noise(n+index*13+tick*3)*stage.height/8)*8;g.fillRect(x,y,6+Math.floor(noise(n+index)*3)*6,3)}g.globalAlpha=1}
+// Brighten emitted light without changing screen geometry or washing out blacks.
+g.globalCompositeOperation='screen';g.globalAlpha=CityEnvironment.billboardExposure(light);g.drawImage(stage,0,0);g.globalAlpha=1;g.globalCompositeOperation='source-over';
+lightContext.drawImage(stage,0,0,8,8);const pixels=lightContext.getImageData(0,0,8,8).data,rgb=[0,0,0];
+for(let i=0;i<pixels.length;i+=4)for(let c=0;c<3;c++)rgb[c]+=pixels[i+c]/64;
+screen.light=CityEnvironment.billboardLight(screen.p,rgb);
+}
 function asciiPass(){sc.imageSmoothingEnabled=true;sc.imageSmoothingQuality='high';sc.drawImage(world,0,0,cols,rows);const d=sc.getImageData(0,0,cols,rows).data;output.imageSmoothingEnabled=false;for(let y=0;y<rows;y++)for(let x=0;x<cols;x++){const index=y*cols+x,k=index*4,{color:ci,glyph:j}=cell(d[k],d[k+1],d[k+2],x,y),code=ci*8+j;if(previousCells[index]===code)continue;previousCells[index]=code;output.drawImage(atlas,ci*6,j*10,6,10,x*6,y*10,6,10)}}
 
 const dateFormat=new Intl.DateTimeFormat('en-US',{timeZone:CityCalendar.zone,month:'short',day:'numeric',year:'numeric'}),timeFormat=new Intl.DateTimeFormat('en-US',{timeZone:CityCalendar.zone,hour:'numeric',minute:'2-digit'});
 function updateTime(){const p=CityCalendar.parts(epoch);el('dateValue').textContent=dateFormat.format(new Date(epoch));el('date').value=p.date;el('timeValue').textContent=timeFormat.format(new Date(epoch));el('time').value=p.hour*60;el('time').style.setProperty('--progress',`${p.hour/24*100}%`)}
 function draw(){if(!ready)return;const start=performance.now();time=epoch/60000;ctx.setTransform(1,0,0,1,0,0);ctx.drawImage(environment.render(epoch),0,0);
-  for(const screen of screens){const state=adAt(screen.index,time),ad=ads[state.ad];if(!ad.ready)continue;ctx.save();path(screen.p);ctx.clip();screenAd(screen,ad,state);ctx.restore()}
   const light=CityCalendar.lightAt(epoch),people=CityLife.peopleAt(time),cars=CityTraffic.carsAt(time);
+  for(const screen of screens){const state=adAt(screen.index,time),ad=ads[state.ad];if(ad.ready)screenAd(screen,ad,state,light)}
+  CityEnvironment.paintBillboardGlow(ctx,light,screens);
+  for(const screen of screens){if(!screen.light)continue;ctx.save();path(screen.p);ctx.clip();project(screen);ctx.restore()}
   CityEnvironment.paintReflections(ctx,light,screens);for(const car of cars)CityTraffic.groundLights(ctx,car,light);
   const layers=[...cars.map(c=>({y:c.y,paint:()=>CityTraffic.paintCar(ctx,c,light)})),...people.map(p=>({y:p.y,paint:()=>CityLife.paintWalker(ctx,p,light)})),...CityLife.furnitureLayers().map(layer=>({y:layer.y,paint:()=>layer.paint(ctx)}))].sort((a,b)=>a.y-b.y);
   for(const layer of layers)layer.paint();
+  CityEnvironment.paintBillboardGlow(ctx,light,screens,true);
   asciiPass();ambient.drawImage(canvas,0,0,120,80);updateTime();canvas.dataset.renderMs=(performance.now()-start).toFixed(1);canvas.dataset.columns=cols;canvas.dataset.adAssignments=screens.map(s=>s.lastAd).join(',');canvas.dataset.frame=++frameNumber;canvas.dataset.simulationTime=time.toFixed(4);canvas.dataset.epoch=epoch.toFixed(0);canvas.dataset.date=light.date;canvas.dataset.people=people.length;canvas.dataset.vehicles=cars.length;canvas.dataset.vehicleDirections=cars.map(c=>c.lane).join(',');canvas.dataset.windows=environment.windowCount;canvas.dataset.hour=light.hour.toFixed(3);canvas.dataset.speed=speed;canvas.dataset.direction=direction;canvas.dataset.sunrise=new Date(light.sunrise).toISOString();canvas.dataset.sunset=new Date(light.sunset).toISOString();canvas.dataset.motionFrames=ads.slice(0,5).map(a=>Math.floor(time*a.fps)%a.frames).join(',');canvas.dataset.skyPixels=environment.skyPixels;
 }
 function resizeGrid(){rows=size(cols).rows;canvas.width=cols*6;canvas.height=rows*10;sample.width=cols;sample.height=rows;previousCells=new Uint16Array(cols*rows);previousCells.fill(65535);draw()}

@@ -17,7 +17,7 @@ function canvas(){const c={dataset:{},style:{setProperty(){}},width:0,height:0,c
 class ImageMock {constructor(){this.naturalWidth=240;this.naturalHeight=360;images.push(this)}}
 const elements={art:canvas(),ambient:canvas()};function element(id){return elements[id]||(elements[id]={style:{setProperty(){}},setAttribute(){},removeAttribute(){},focus(){}})}
 const win={};vm.runInNewContext(fs.readFileSync('dist/projects/ASCII/nyc/motion-manifest.js','utf8'),{window:win});
-const sandbox={BillboardModel:model,AdDirector:director,CharacterGrid:grid,CityLife:life,CityTraffic:traffic,CityCalendar,Intl,Date,MotionManifest:win.MotionManifest,CityEnvironment:{setPalette(){},palettes:{},paintReflections(){},create(){return{render:hour=>({hour}),skyPixels:170000}}},Image:ImageMock,
+const sandbox={BillboardModel:model,AdDirector:director,CharacterGrid:grid,CityLife:life,CityTraffic:traffic,CityCalendar,Intl,Date,MotionManifest:win.MotionManifest,CityEnvironment:{setPalette(){},palettes:{},paintReflections(){},paintBillboardGlow(){},billboardExposure:()=>.85,billboardLight:()=>({power:1}),create(){return{render:hour=>({hour}),skyPixels:170000}}},Image:ImageMock,
  document:{hidden:false,querySelectorAll(){return[]},getElementById:element,addEventListener(){},createElement(tag){assert.equal(tag,'canvas','No hidden autoplay video dependency');return canvas()}},
  matchMedia:()=>({matches:false}),performance:{now:()=>0},requestAnimationFrame(fn){nextFrame=fn},setTimeout(fn){fn()},clearTimeout(){}};
 (async()=>{
@@ -27,7 +27,7 @@ const sandbox={BillboardModel:model,AdDirector:director,CharacterGrid:grid,CityL
  nextFrame(1000);nextFrame(1180);const first=elements.art.dataset.motionFrames;nextFrame(1360);
  assert.notEqual(elements.art.dataset.motionFrames,first,'Campaign frames advance without a pause/play click');
  assert(+elements.art.dataset.simulationTime>0,'Walkers and ads share an advancing clock');
- const [out,ambient,world,sample,atlas]=canvases;
+ const [out,ambient,world,sample,lightSample,atlas]=canvases;
  const columns=390,rows=grid.size(columns).rows;
  assert.equal(out.width,columns*6);assert.equal(out.height,rows*10);assert.equal(out.dataset.columns,390);
  assert(out.context.draws.every(a=>a[0]===atlas),'All visible content must pass through the character atlas');
