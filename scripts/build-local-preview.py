@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Build the visual review as an offline file or a page using hosted assets."""
-import argparse,base64,json,mimetypes,re
+import argparse,base64,json,mimetypes,re,subprocess
 from pathlib import Path
 root=Path(__file__).resolve().parents[1]
 scene=root/'dist/projects/ASCII/nyc'
@@ -8,6 +8,8 @@ parser=argparse.ArgumentParser(description=__doc__)
 parser.add_argument('output',nargs='?',type=Path)
 parser.add_argument('--hosted',action='store_true',help='Load scene assets by URL instead of embedding them')
 args=parser.parse_args()
+# Never publish a candidate with discontinuous or broken body mechanics.
+subprocess.run(['node',str(root/'scripts/gait/judge.cjs'),str(scene/'pedestrian-rig.js'),str(root/'dist/gait-study/current-report.json')],check=True,stdout=subprocess.DEVNULL)
 output=args.output or (root/'dist/review/index.html' if args.hosted else root/'.openai/Times-Square-Local-Test.html')
 html=(scene/'index.html').read_text()
 html=re.sub(r'<base[^>]*>','',html)
