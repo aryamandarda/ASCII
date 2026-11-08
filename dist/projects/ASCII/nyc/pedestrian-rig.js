@@ -41,7 +41,7 @@
     const shoulderYaw=-.055*Math.cos(phase)*walking;
     const shoulderRoll=.025*Math.sin(phase)*walking;
     const lean=(.018+.006*Math.sin(phase*2))*walking;
-    const hipForwardShift=-.035*Math.sin(phase*2)*walking;
+    const hipForwardShift=-.028*Math.sin(phase*2)*walking;
     const forwardReach=.25*stride/height+.004;
     let hipHeight=Math.min(.510,.051+Math.sqrt(Math.max(.01,.487**2-forwardReach**2))+.012);
     hipHeight=Math.min(hipHeight,...feet.map(f=>{
