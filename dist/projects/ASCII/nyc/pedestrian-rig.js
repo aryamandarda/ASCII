@@ -39,8 +39,8 @@
     const pelvisYaw=.065*Math.cos(phase)*walking;
     const shoulderYaw=-.055*Math.cos(phase)*walking;
     const lean=(.018+.006*Math.sin(phase*2))*walking;
-    let hipHeight=.505+.002*Math.cos(2*phase);
-    hipHeight=Math.min(hipHeight,...feet.map(f=>{
+    let hipHeight=.515;
+    hipHeight=Math.min(hipHeight,...feet.filter(f=>f.stance).map(f=>{
       const hipForward=f.side*body.hipWidth*(p.build||1)*Math.sin(pelvisYaw);
       return .039+f.lift+Math.sqrt(Math.max(.01,(body.thigh+body.shank-.004)**2-(f.forward-hipForward)**2));
     }));
@@ -54,7 +54,11 @@
     const hip=[sway,body.hip+drop,0],shoulder=[sway*.45,body.shoulder+upperDrop, lean];
     const legs=feet.map(f=>{
       const joint=[hip[0]+f.side*body.hipWidth*build,hip[1],f.side*body.hipWidth*build*Math.sin(pelvisYaw)];
-      const ankle=[joint[0],mix(body.ankle-f.lift*walking,-.039,sit),mix(f.forward*walking,.22,sit)];
+      // A trailing swing leg must not pull the supporting hip down into a
+      // crouch. Lift its ankle only enough to stay within fixed-leg reach.
+      const reachLift=hipHeight-.039-Math.sqrt(Math.max(.01,(body.thigh+body.shank-.004)**2-(f.forward-joint[2])**2));
+      const lift=f.stance?f.lift:Math.max(f.lift,reachLift);
+      const ankle=[joint[0],mix(body.ankle-lift*walking,-.039,sit),mix(f.forward*walking,.22,sit)];
       // Seated ankles stay under bent knees; the same IK keeps segment lengths.
       const knee=solveKnee(joint,ankle);
       return{side:f.side,hip:joint,knee,ankle,stance:f.stance,roll:f.roll*walking};
