@@ -21,7 +21,9 @@
   function project(p){return{x:640+800*p[0]/p[1],y:600+1440/p[1],h:1400/p[1]}}
   function groundPath(p){const lengths=p.slice(1).map((v,i)=>distance(v,p[i]));return{p,lengths,length:lengths.reduce((a,b)=>a+b,0)}}
   function path(points){return groundPath(points.map(unproject))}
-  function appearance(id){return{id,coat:coats[mod(id,coats.length)],skin:skins[mod(id,skins.length)],hair:['#29252b','#49352d','#ab946d','#8b8d94'][mod(id,4)],height:.93+random(id+11)*.14,build:.88+random(id+16)*.25,stride:1.25+random(id+26)*.16,gait:.75+random(id+31)*.40,armSwing:.7+random(id+32)*.55,bob:.0015+random(id+36)*.002,paceInterval:7+random(id+38)*12,phase:random(id+39)*Math.PI*2,radius:.225+random(id+41)*.035}};
+  // Broad, repeatable personal pace; the crowd strolls rather than marches.
+  const walkingSpeed=id=>.54+.46*random(id+6)**.75;
+  function appearance(id){const speed=walkingSpeed(id);return{id,speed,coat:coats[mod(id,coats.length)],skin:skins[mod(id,skins.length)],hair:['#29252b','#49352d','#ab946d','#8b8d94'][mod(id,4)],height:.93+random(id+11)*.14,build:.88+random(id+16)*.25,stride:.98+.24*(speed-.54)/.46+random(id+26)*.10,gait:.75+random(id+31)*.40,armSwing:.7+random(id+32)*.55,bob:.0015+random(id+36)*.002,paceInterval:9+random(id+38)*18,phase:random(id+39)*Math.PI*2,radius:.225+random(id+41)*.035}};
   // A few occupied pockets of furniture, with clear walking space between them.
   // Chair angles are ground-plane bearings, so opposite chairs really face inward.
   const tables=[
@@ -38,7 +40,7 @@
     return{tableId:table.id,index,ground,facing,...project(ground)};
   }));
   const obstacles=tables.map(t=>({id:t.id,p:unproject([t.x,t.y]),radius:Math.max(...t.chairs.map(c=>c.radius))+.23}));
-  const trips=new Map(),SLOT=.40,MAX_TRIP=600;
+  const trips=new Map(),SLOT=.60,MAX_TRIP=600;
   function trip(slot){
     if(trips.has(slot))return trips.get(slot);
     const birth=slot*SLOT,ratio=trafficAt(CityCalendar.parts(birth*60000).hour).ratio;let result=null;
@@ -47,7 +49,7 @@
       let points=template.map((p,i)=>[p[0]+(i===0||i===template.length-1?0:(random(slot+i*17)-.5)*100),p[1]+(random(slot+i*23+17)-.5)*28]);
       // Each journey gets different destinations and bends, not just a lateral offset.
       if(random(slot+3)>.5)points.reverse();
-      const route=navigate(path(points)),speed=1.18+random(slot+6)*.23;
+      const route=navigate(path(points)),speed=walkingSpeed(slot);
       result={...appearance(slot),birth,route,speed,duration:route.length/(speed*.8),kind:'walk'};
     }
     trips.set(slot,result);if(trips.size>8000)trips.delete(trips.keys().next().value);return result;
@@ -57,7 +59,7 @@
     if(random(id+33)>.10+.84*trafficAt(CityCalendar.parts(birth*60000).hour).ratio)return null;
     const edge=table.x<640?-240:1520,approach=project(chair.ground.map((v,i)=>v-chair.facing[i]*.65));
     const route=navigate(path([[edge,table.y+120],[approach.x,table.y+105],[approach.x,approach.y],[chair.x,chair.y]]),table.id);
-    return{...appearance(id),birth,route,speed:1.14+random(id+12)*.18,duration:route.length/.85,kind:'visit',seat,tableId:table.id,sitFacing:chair.facing,dwell:120+random(id+20)*65};
+    return{...appearance(id),birth,route,duration:route.length/.65,kind:'visit',seat,tableId:table.id,sitFacing:chair.facing,dwell:120+random(id+20)*65};
   }
   function inPlaza(p){const q=project(p);if(q.x<735||q.x>1500)return true;return q.y-q.h*.06>642+(q.x-735)*148/765+2}
   function segmentDistance(a,b,p){const dx=b[0]-a[0],dz=b[1]-a[1],d=dx*dx+dz*dz,t=d?clamp(((p[0]-a[0])*dx+(p[1]-a[1])*dz)/d,0,1):0;return Math.hypot(a[0]+dx*t-p[0],a[1]+dz*t-p[1])}
@@ -145,7 +147,7 @@
           continue;
         }
         const fx=(target[0]-a.pos[0])/gap,fz=(target[1]-a.pos[1])/gap;
-        const pace=.90+.06*Math.sin(t/a.paceInterval*Math.PI*2+a.phase),weave=Math.sin(t/(a.paceInterval*.73)+a.phase)*.065;
+        const pace=.91+.05*Math.sin(t/a.paceInterval*Math.PI*2+a.phase),weave=Math.sin(t/(a.paceInterval*.73)+a.phase)*.045;
         let vx=(fx-fz*weave)*a.speed*pace,vz=(fz+fx*weave)*a.speed*pace;
         const neighbors=agents.filter(b=>b!==a&&!b.done&&distance(a.pos,b.pos)<2.2);
         for(const b of neighbors){

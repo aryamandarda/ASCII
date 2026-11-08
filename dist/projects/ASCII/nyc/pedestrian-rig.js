@@ -67,10 +67,18 @@
     return{hip,shoulder,head,yaw,headYaw,drop,legs,arms,walking};
   }
   const project=(point,yaw)=>[point[0]*Math.cos(yaw)+point[2]*Math.sin(yaw),point[1]+.16*(point[2]*Math.cos(yaw)-point[0]*Math.sin(yaw))];
+  function shell(rings){
+    const ring=([y,rx,rz,z=0])=>Array.from({length:8},(_,i)=>[Math.cos(i*TAU/8)*rx,y,z+Math.sin(i*TAU/8)*rz]);
+    const points=rings.map(ring),faces=[];
+    for(let row=0;row<points.length-1;row++)for(let i=0;i<8;i++)faces.push({row,side:i,points:[points[row][i],points[row][(i+1)%8],points[row+1][(i+1)%8],points[row+1][i]]});
+    return faces;
+  }
+  const torsoMesh=cold=>shell([[-.846,.050,.038],[-.804,cold?.118:.109,.066],[-.716,.104,.073],[-.636,.092,.063],[-.552,.092,.061]]);
+  const neckMesh=()=>shell([[body.neckTop,.022,.025,.012],[body.neckBottom+.01,.026,.028,.012]]);
   function paint(g,p,light,weather){
     const h=p.h*p.height,x=p.x,y=p.y,r=pose(p),back=(1-Math.cos(r.yaw))/2;
     const shade=.78+.22*light.day,cold=weather&&weather.temperature<8;
-    const color=(hex,gain=1)=>`rgb(${[1,3,5].map(i=>Math.round(clamp(parseInt(hex.slice(i,i+2),16)*shade*gain,0,255))).join(',')})`;
+    const color=(hex,gain=1)=>{const rgb=[1,3,5].map(i=>parseInt(hex.slice(i,i+2),16));return `rgb(${(root.CityEnvironment?root.CityEnvironment.materialColor(rgb,light,gain):rgb.map(v=>Math.round(clamp(v*shade*gain,0,255)))).join(',')})`};
     const P=point=>{const q=project(point,r.yaw);return[x+q[0]*h,y+q[1]*h]};
     function line(hex,width,points,gain=1){g.strokeStyle=color(hex,gain);g.lineWidth=h*width;g.lineCap='round';g.lineJoin='round';g.beginPath();points.forEach((v,i)=>i?g.lineTo(...P(v)):g.moveTo(...P(v)));g.stroke()}
     function poly(hex,points,gain=1){g.fillStyle=color(hex,gain);g.beginPath();points.forEach((v,i)=>i?g.lineTo(...P(v)):g.moveTo(...P(v)));g.closePath();g.fill()}
@@ -87,13 +95,20 @@
       line(p.skin,.029,[a.wrist,[a.wrist[0],a.wrist[1]+.037,a.wrist[2]+.005]])};
     const sortedArms=r.arms.slice().sort((a,b)=>project(a.shoulder,r.yaw)[1]-project(b.shoulder,r.yaw)[1]);arm(sortedArms[0]);
     poly(pants,[torso(-.087,-.573),torso(.087,-.573),torso(.089,-.482),torso(0,-.474),torso(-.089,-.482)]);
-    // Front and back planes share the same ribcage/pelvis and rotate together.
-    const width=cold?.118:.109;
-    for(const z of [-.035,.035])poly(p.coat,[torso(-.051,-.848,z),torso(.051,-.848,z),torso(width,-.804,z),torso(.092,-.573,z),torso(-.092,-.573,z),torso(-width,-.804,z)],z<0?.86:1);
-    g.globalAlpha=1-back;poly('#d1c9b5',[torso(-.035,-.838,.039),torso(.035,-.838,.039),torso(.020,-.768,.039),torso(-.02,-.768,.039)]);
-    line(p.coat,.012,[torso(-.025,-.815,.043),torso(0,-.765,.043),torso(0,-.58,.043)],.68);g.globalAlpha=1;
+    // A closed, faceted ribcage has real side walls, not two zero-width planes.
+    // Stable cloth panels/folds provide tonal variation before the ASCII pass.
+    const depth=face=>face.points.reduce((v,p)=>v+p[2]*Math.cos(r.yaw)-p[0]*Math.sin(r.yaw),0)/4;
+    const paintShell=(faces,hex)=>faces.sort((a,b)=>depth(a)-depth(b)).forEach(f=>{
+      const angle=(f.side+.5)*TAU/8,grain=.025*Math.sin(p.id*3+f.row*1.7+f.side*2.1);
+      poly(hex,f.points.map(v=>torso(...v)),.88+.10*Math.sin(angle)+grain);
+    });
+    paintShell(shell([[-.573,.087,.057],[-.483,.089,.060]]),pants);
+    paintShell(torsoMesh(cold),p.coat);
+    g.globalAlpha=Math.max(0,Math.cos(r.yaw));poly('#d1c9b5',[torso(-.031,-.835,.043),torso(.031,-.835,.043),torso(.017,-.785,.070),torso(-.017,-.785,.070)]);
+    line(p.coat,.010,[torso(0,-.811,.071),torso(0,-.716,.078),torso(0,-.56,.065)],.66);
+    for(const side of [-1,1]){line(p.coat,.007,[torso(side*.055,-.69,.068),torso(side*.064,-.655,.066),torso(side*.054,-.612,.065)],1.13);line(p.coat,.006,[torso(side*.055,-.651,.066),torso(side*.080,-.644,.06)],.69)}g.globalAlpha=1;
     arm(sortedArms[1]);
-    poly(p.skin,[torso(-.021,body.neckTop,.015),torso(.021,body.neckTop,.015),torso(.024,body.neckBottom,.015),torso(-.024,body.neckBottom,.015)]);
+    paintShell(neckMesh(),p.skin);
     if(cold)line(p.coat,.028,[torso(-.045,-.844,.02),torso(.045,-.844,.02)],.73);
     const head=P(r.head),hx=head[0],hy=head[1],rx=h*.052,ry=h*body.headRadius,face=Math.cos(r.headYaw),profile=Math.sin(r.headYaw);
     g.save();g.beginPath();g.ellipse(hx,hy,rx,ry,0,0,TAU);g.clip();g.fillStyle=color(p.hair);g.fillRect(hx-rx,hy-ry,rx*2,ry*2);
@@ -109,6 +124,6 @@
     if(p.id%4===0){g.globalAlpha=smooth((back-.25)/.5);poly('#484a52',[torso(-.065,-.77,-.05),torso(.065,-.77,-.05),torso(.068,-.60,-.05),torso(-.068,-.60,-.05)]);g.globalAlpha=1;}
     g.restore();
   }
-  root.PedestrianRig={body,pose,paint,footCycle,solveKnee,project,angleDelta,turnTowards};
+  root.PedestrianRig={body,pose,paint,footCycle,solveKnee,project,angleDelta,turnTowards,torsoMesh,neckMesh};
   if(typeof module!=='undefined')module.exports=root.PedestrianRig;
 })(typeof window==='undefined'?globalThis:window);

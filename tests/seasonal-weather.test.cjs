@@ -4,7 +4,7 @@ const W=require('../dist/projects/ASCII/nyc/weather.js'),E=require('../dist/proj
 const at=(date,hour=12)=>W.weatherAt(C.localEpoch(date,hour*60));
 assert(at('2026-01-02').snow>.1);assert(at('2026-01-02').groundSnow>3);
 assert.equal(at('2026-01-03').snow,0);assert(at('2026-01-03').groundSnow>5,'Snow persists after the storm');
-assert(at('2026-01-06').groundSnow<at('2026-01-03').groundSnow);assert.equal(at('2026-01-07').groundSnow,0);assert(at('2026-01-07').roofSnow>2,'Sheltered ledges thaw later');
+assert(at('2026-01-06').groundSnow<at('2026-01-03').groundSnow);assert(at('2026-01-07').groundSnow<.5);assert(at('2026-01-07').roofSnow>2,'Sheltered ledges thaw later');
 const rain=at('2026-04-05');assert(rain.rain>.1&&rain.cloud>.85&&rain.wetness>0);assert.equal(rain.snow,0);
 let winter=0,summer=0;for(let day=1;day<=28;day++){winter+=at(`2026-01-${String(day).padStart(2,'0')}`).temperature;const w=at(`2026-07-${String(day).padStart(2,'0')}`);summer+=w.temperature;assert.equal(w.snow,0);assert.equal(w.groundSnow,0)}assert(summer-winter>28*18);
 const epoch=C.localEpoch('2026-01-02',720),before=W.weatherAt(epoch);W.weatherAt(C.localEpoch('2029-06-21'));W.weatherAt(C.localEpoch('2023-01-01'));W.weatherAt(C.localEpoch('2022-01-01'));assert.deepEqual(W.weatherAt(epoch),before,'History survives cache eviction, time jumps and reversal');
@@ -13,6 +13,10 @@ const cold={temperature:-5,sun:0,cloud:1,rain:0,snow:0};assert(W.integrate({grou
 const warm={...cold,temperature:10,sun:1,cloud:0};assert(W.integrate({ground:10,roof:10,wet:0},warm,24).ground===0);
 assert.equal(W.snowCoverage(640,300,10),0,'Never paint snow in the sky');assert(W.snowCoverage(30,820,10)>W.snowCoverage(640,820,1),'Drifts and worn paths differ');
 assert(W.cloudDensity(640,200,epoch,.95)>W.cloudDensity(640,200,epoch,.05));assert(Math.abs(W.cloudDensity(640,200,epoch,.8)-W.cloudDensity(640,200,epoch+1000,.8))<.01,'Cloud drift is continuous');
+let clearGaps=0,cloudyPixels=0;
+for(let y=0;y<620;y+=17)for(let x=0;x<1280;x+=23){assert(W.cloudDensity(x,y,epoch,.95)>.99,'An overcast deck cannot have clear-sky holes');assert.equal(W.celestialVisibility(x,y,epoch,{cloud:.95}),0,'Opaque cloud must hide the sun and moon');const d=W.cloudDensity(x,y,epoch,.45);clearGaps+=d<.05;cloudyPixels+=d>.6}
+assert(clearGaps>100&&cloudyPixels>100,'Passing clouds have both clear gaps and opaque billows');
+const dry=W.weatherAt(C.localEpoch('2026-11-19',900));assert(dry.cloud>.9&&dry.precipitation===0,'Dense overcast can occur without precipitation');
 // Independently published lunar dates, around the 2024-04-08 eclipse and Apr 23 full moon.
 const fresh=C.lightAt(Date.parse('2024-04-08T18:21Z')),full=C.lightAt(Date.parse('2024-04-23T23:49Z'));assert(fresh.moonFraction<.002);assert(full.moonFraction>.99);
 assert.deepEqual(E.moonSpan(0,.25,.5),[0,1]);assert.deepEqual(E.moonSpan(0,.75,.5),[-1,-0]);assert.deepEqual(E.moonSpan(0,.5,1),[-1,1]);

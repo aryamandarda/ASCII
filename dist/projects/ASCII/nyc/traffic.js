@@ -14,7 +14,7 @@
         if(rand(id+7)>ratio)continue;
         // Admit cars only when the entrance has room, even during a red-light queue.
         if(vehicles.some(c=>c.lane===lane&&c.s<-1))continue;
-        vehicles.push({id,lane,s:-8,speed:0,maxSpeed:1.75+rand(id+21)*.55,length:4.35+rand(id+12)*.45,taxi:rand(id+9)<.48,color:['#5e7588','#c9d2ce','#354450','#a15247'][mod(id,4)]});
+        vehicles.push({id,lane,s:-8,speed:0,maxSpeed:3.4+rand(id+21)*1.4,length:4.35+rand(id+12)*.45,taxi:rand(id+9)<.48,color:['#5e7588','#c9d2ce','#354450','#a15247'][mod(id,4)]});
       }}
       for(let lane=0;lane<2;lane++){
         const line=vehicles.filter(c=>c.lane===lane).sort((a,b)=>b.s-a.s);let leader=null;
@@ -23,7 +23,7 @@
           const stop=lane===0?44:26;
           if(!green(t,lane)&&car.s+car.length/2<stop+.1)available=Math.min(available,stop-car.s-car.length/2);
           const target=Math.min(car.maxSpeed,Math.sqrt(2*1.2*Math.max(0,available))),oldSpeed=car.speed;
-          car.speed=clamp(target,Math.max(0,car.speed-1.35*STEP),car.speed+.55*STEP);
+          car.speed=clamp(target,Math.max(0,car.speed-1.8*STEP),car.speed+1.05*STEP);
           const advance=Math.min(car.speed*STEP,Math.max(0,available));car.s+=advance;if(advance<car.speed*STEP)car.speed=advance/STEP;
           car.braking=car.speed<oldSpeed-.03||car.speed<.16;leader=car;
         }
@@ -40,7 +40,7 @@
     const rear=point(0,-2.1),tail=g.createRadialGradient(...rear,0,...rear,42);tail.addColorStop(0,`rgba(255,35,43,${l.night*(c.braking?.30:.13)*c.alpha})`);tail.addColorStop(1,'rgba(255,35,43,0)');g.fillStyle=tail;g.fillRect(rear[0]-42,rear[1]-18,84,36);g.restore();
   }
   function paintCar(g,c,l){const sign=c.lane===0?1:-1,P=(x,f,h)=>road(c.u+x/7,c.v+sign*f/LENGTH,h),body=c.taxi?'#edb534':c.color,top=c.taxi?'#ffd35b':'#9aabb5';
-    function poly(color,points){g.fillStyle=color;g.beginPath();points.forEach((p,i)=>i?g.lineTo(...p):g.moveTo(...p));g.closePath();g.fill()}
+    function poly(color,points){g.fillStyle=root.CityEnvironment&&l.irradiance?`rgb(${root.CityEnvironment.materialColor([1,3,5].map(i=>parseInt(color.slice(i,i+2),16)),l).join(',')})`:color;g.beginPath();points.forEach((p,i)=>i?g.lineTo(...p):g.moveTo(...p));g.closePath();g.fill()}
     g.save();g.globalAlpha=c.alpha;const shade=.76+.24*l.day;
     const h=(6+Math.max(0,c.x-735)*.06);poly('#202938',[P(-.95,-2.3,.05),P(.95,-2.3,.05),P(.95,2.3,.05),P(-.95,2.3,.05)]);
     // Tires sit on the road plane; roof and cabin share the same projective body.

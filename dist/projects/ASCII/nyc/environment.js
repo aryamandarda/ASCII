@@ -23,27 +23,48 @@
   function billboardLight(points,rgb){
     const xs=points.map(p=>p[0]),ys=points.map(p=>p[1]),w=Math.max(...xs)-Math.min(...xs),h=Math.max(...ys)-Math.min(...ys);
     const peak=Math.max(...rgb,1),luminance=(rgb[0]*.2126+rgb[1]*.7152+rgb[2]*.0722)/255;
-    return{x:xs.reduce((a,b)=>a+b)/4,y:ys.reduce((a,b)=>a+b)/4,w,h,
+    const lamp={x:xs.reduce((a,b)=>a+b)/4,y:ys.reduce((a,b)=>a+b)/4,w,h,
       color:rgb.map(v=>Math.round(v/peak*255)),power:Math.min(1,Math.sqrt(w*h)/150)*Math.sqrt(luminance)};
+    return {...lamp,...emitterGeometry(lamp),radiance:rgb.map(srgbToLinear)};
   }
-  // Dry paving receives diffuse color, not readable, striped copies of ads.
-  // Normalize overlapping sources and cap opacity so white campaigns cannot
-  // bleach the ground. Fade in over the pavement rather than clipping a polygon.
-  function groundLightAt(x,y,night,lamps){
-    const edge=648+Math.abs(x-640)*.065,t=clamp((y-edge)/90,0,1),fade=t*t*(3-2*t);
-    if(!night||!fade)return[0,0,0,0];
-    let weight=0,r=0,g=0,b=0;
-    for(const lamp of lamps){
-      const dx=(x-lamp.x)/(110+lamp.w*.7),dy=(y-(715+Math.abs(lamp.x-640)*.10))/(140+lamp.h*.2);
-      const w=lamp.power*.8*Math.exp(-2*(dx*dx+dy*dy));
-      weight+=w;r+=lamp.color[0]*w;g+=lamp.color[1]*w;b+=lamp.color[2]*w;
+  // Approximate facade depth in the same metre space as pedestrian projection.
+  // This is a 2.5D reconstruction, not calibrated photometry or a ray tracer.
+  function emitterGeometry(lamp){
+    const offset=lamp.x-640,central=Math.abs(offset)<92,z=central?36:1440/(65+Math.abs(offset)*.09);
+    return{position:[offset*z/800,Math.max(2.5,1.8+(600-lamp.y)*z/800),z],
+      normal:central?[0,0,-1]:[-Math.sign(offset)*.90,0,-.44],area:clamp(lamp.w*lamp.h*(z/800)**2,1,180)};
+  }
+  function irradianceAt(point,lamps,normal=[0,1,0]){
+    const rgb=[0,0,0];
+    for(const lamp of lamps){if(lamp.power<=0)continue;const source=lamp.position?lamp:{...lamp,...emitterGeometry(lamp)},delta=source.position.map((v,i)=>v-point[i]),d2=delta.reduce((s,v)=>s+v*v,0),d=Math.sqrt(d2)||1;
+      const emission=Math.max(0,-delta.reduce((s,v,i)=>s+v*source.normal[i],0)/d),incidence=Math.max(0,delta.reduce((s,v,i)=>s+v*normal[i],0)/d);
+      // Finite area softens the near field; far field falls as inverse distance
+      // squared. A small diffuse bounce term lights away-facing surfaces too.
+      const energy=5.2*source.area/(d2+source.area*.5)*(.12+.88*emission)*(.22+.78*incidence),radiance=lamp.radiance||lamp.color.map(v=>srgbToLinear(v)*lamp.power);
+      for(let c=0;c<3;c++)rgb[c]+=radiance[c]*energy;
     }
-    return weight?[r/weight,g/weight,b/weight,.26*night*fade*(1-Math.exp(-weight))]:[0,0,0,0];
+    return rgb;
+  }
+  function materialColor(rgb,light,gain=1){const ambient=.34+.66*light.day,energy=light.irradiance||[0,0,0];
+    return rgb.map((v,c)=>linearToSrgb(clamp(srgbToLinear(v)*gain*(ambient+light.night*energy[c]),0,1)));
+  }
+  function receiverLight(light,x,y,height,lamps){const z=1440/Math.max(12,y-600),point=[(x-640)*z/800,height,z];
+    return {...light,irradiance:irradianceAt(point,lamps,[0,.55,-.45])};
+  }
+  // Broad diffuse illumination over the whole plaza. The same emitters also
+  // shade people/cars; no reflected ad image or illuminated sky is introduced.
+  function groundLightAt(x,y,night,lamps){
+    const edge=x<550?704-x*.10:x<745?649:620+Math.max(0,x-1110)*.18,t=clamp((y-edge)/50,0,1),fade=t*t*(3-2*t);
+    if(!night||!fade)return[0,0,0,0];
+    const z=1440/Math.max(12,y-600),energy=irradianceAt([(x-640)*z/800,0,z],lamps),peak=Math.max(...energy),luminance=energy[0]*.2126+energy[1]*.7152+energy[2]*.0722;
+    return peak>0?[...energy.map(v=>linearToSrgb(v/peak)),.52*night*fade*(1-Math.exp(-luminance*1.4))]:[0,0,0,0];
   }
   let groundCanvas,groundContext,groundPixels;
-  function paintBillboardGlow(g,l,screens,ground=false){
+  let haloCanvas,haloContext;
+  function paintBillboardGlow(g,l,screens,ground=false,skyMask){
     if(l.night<=0)return;
     const lamps=screens.map(s=>s.light).filter(lamp=>lamp&&lamp.power>.01);
+    if(!ground&&skyMask){if(!haloCanvas){haloCanvas=document.createElement('canvas');haloCanvas.width=W;haloCanvas.height=H;haloContext=haloCanvas.getContext('2d')}haloContext.clearRect(0,0,W,H);paintBillboardGlow(haloContext,l,screens);haloContext.globalCompositeOperation='destination-out';haloContext.drawImage(skyMask,0,0);haloContext.globalCompositeOperation='source-over';g.save();g.globalCompositeOperation='screen';g.drawImage(haloCanvas,0,0);g.restore();return}
     g.save();g.globalCompositeOperation='screen';
     if(ground){
       if(!groundCanvas){groundCanvas=document.createElement('canvas');groundCanvas.width=128;groundCanvas.height=86;groundContext=groundCanvas.getContext('2d');groundPixels=groundContext.createImageData(128,86)}
@@ -72,6 +93,32 @@
     const tones=[[232,240,246],[220,234,248],[244,245,239],[211,230,242],[250,239,219]];
     return tones[Math.floor(rand(id+77)*tones.length)];
   }
+  // Receding facades are too small/connected for component extraction. Map their
+  // window bays explicitly and attenuate them relative to the nearby buildings.
+  const distantFacades=[
+    {name:'Allianz front',quad:[[523,385],[559,381],[557,512],[511,525]],cols:6,rows:18,strength:.40},
+    {name:'Allianz side',quad:[[561,383],[574,393],[569,511],[559,516]],cols:3,rows:16,strength:.26},
+    {name:'Left narrow tower',quad:[[469,311],[478,307],[465,513],[458,505]],cols:2,rows:25,strength:.30},
+    {name:'Left deep street',quad:[[576,484],[590,479],[588,551],[572,564]],cols:3,rows:10,strength:.24},
+    {name:'Right deep street',quad:[[735,495],[749,485],[752,605],[731,614]],cols:3,rows:15,strength:.25},
+    {name:'Barclays offices',quad:[[762,365],[817,356],[822,398],[757,406]],cols:7,rows:6,strength:.38},
+    {name:'Left street offices',quad:[[529,554],[558,546],[560,593],[525,605]],cols:5,rows:7,strength:.36}
+  ];
+  function distantWindows(source){const windows=[];
+    distantFacades.forEach((facade,index)=>{const transform=BillboardModel.homography(facade.quad);
+      for(let row=0;row<facade.rows;row++)for(let col=0;col<facade.cols;col++){
+        const id=2000000+index*1000+row*facade.cols+col;
+        const points=[[.18,.18],[.80,.18],[.80,.72],[.18,.72]].map(([u,v])=>BillboardModel.map(transform,(col+u)/facade.cols,(row+v)/facade.rows));
+        const x=Math.floor(Math.min(...points.map(p=>p[0]))),y=Math.floor(Math.min(...points.map(p=>p[1]))),w=Math.ceil(Math.max(...points.map(p=>p[0])))-x,h=Math.ceil(Math.max(...points.map(p=>p[1])))-y;
+        const tile=document.createElement('canvas');tile.width=w;tile.height=h;const c=tile.getContext('2d'),img=c.createImageData(w,h),color=windowColor(id);let pixels=0;
+        for(let py=0;py<h;py++)for(let px=0;px<w;px++){const X=x+px+.5,Y=y+py+.5;if(!BillboardModel.inside(points,X,Y)||BillboardModel.boards.some(b=>BillboardModel.inside(b[1],X,Y)))continue;
+          const k=(Math.floor(Y)*W+Math.floor(X))*4,j=(py*w+px)*4,texture=(source.data[k]+source.data[k+1]+source.data[k+2])/765;
+          if(texture>.86)continue;for(let n=0;n<3;n++)img.data[j+n]=color[n]*(.76+.24*texture);img.data[j+3]=230;pixels++;
+        }
+        if(!pixels)continue;c.putImageData(img,0,0);windows.push({id,x,y,tile,color,strength:facade.strength});
+      }
+    });return windows;
+  }
   function extractWindows(source){
     const areas=[
       [[320,107],[394,97],[349,321],[263,325]],
@@ -91,18 +138,18 @@
     for(let i=0;i<allowed.length;i++){if(!allowed[i]||seen[i])continue;const q=[i];seen[i]=1;let minX=W,maxX=0,minY=H,maxY=0;for(let n=0;n<q.length;n++){const j=q[n],x=j%W,y=Math.floor(j/W);minX=Math.min(minX,x);maxX=Math.max(maxX,x);minY=Math.min(minY,y);maxY=Math.max(maxY,y);for(const k of [j-1,j+1,j-W,j+W])if(k>=0&&k<allowed.length&&allowed[k]&&!seen[k]){seen[k]=1;q.push(k)}}
       const w=maxX-minX+1,h=maxY-minY+1;if(q.length<8||q.length>2400||w<2||w>60||h<3||h>75)continue;
       const tile=document.createElement('canvas');tile.width=w;tile.height=h;const c=tile.getContext('2d'),img=c.createImageData(w,h),color=windowColor(i);for(const k of q){const x=k%W-minX,y=Math.floor(k/W)-minY,j=(y*w+x)*4;img.data[j]=color[0];img.data[j+1]=color[1];img.data[j+2]=color[2];img.data[j+3]=235}c.putImageData(img,0,0);windows.push({id:i,x:minX,y:minY,tile,color});
-    }return windows;
+    }return windows.concat(distantWindows(source));
   }
   function nightLights(g,l,epoch,windows){
-    for(const w of windows){const on=windowState(w.id,epoch,l)*l.night;if(on<.01)continue;g.globalAlpha=on*.87;g.shadowColor=`rgb(${w.color.join(',')})`;g.shadowBlur=4;g.drawImage(w.tile,w.x,w.y)}g.shadowBlur=0;g.globalAlpha=1;
+    for(const w of windows){const on=windowState(w.id,epoch,l)*l.night*(w.strength||1);if(on<.01)continue;g.globalAlpha=on*.87;g.shadowColor=`rgb(${w.color.join(',')})`;g.shadowBlur=w.strength?1:4;g.drawImage(w.tile,w.x,w.y)}g.shadowBlur=0;g.globalAlpha=1;
   }
   function moonSpan(y,phase,fraction){const edge=Math.sqrt(Math.max(0,1-y*y)),terminator=(1-2*fraction)*edge;return phase<.5?[terminator,edge]:[-edge,-terminator]}
-  function paintMoon(g,l){
+  function paintMoon(g,l,visibility=1){
     if(!l.moon)return;const angle=l.moonAngle-Math.PI/2+(l.moonPhase<.5?0:Math.PI),c=Math.cos(angle),s=Math.sin(angle),r=15;
     const point=(x,y)=>[l.moonX+r*(x*c-y*s),l.moonY+r*(x*s+y*c)];
     const outline=[];for(let i=0;i<=48;i++){const y=-1+i/24;outline.push(point(moonSpan(y,l.moonPhase,l.moonFraction)[1],y))}
     for(let i=48;i>=0;i--){const y=-1+i/24;outline.push(point(moonSpan(y,l.moonPhase,l.moonFraction)[0],y))}
-    g.save();g.globalAlpha=.23+.77*l.night;g.fillStyle='#e9e9d6';g.beginPath();outline.forEach((p,i)=>i?g.lineTo(...p):g.moveTo(...p));g.closePath();g.fill();g.restore();
+    g.save();g.globalAlpha=(.23+.77*l.night)*visibility;g.fillStyle='#e9e9d6';g.beginPath();outline.forEach((p,i)=>i?g.lineTo(...p):g.moveTo(...p));g.closePath();g.fill();g.restore();
   }
   function makeCanvas(){const c=document.createElement('canvas');c.width=W;c.height=H;return c}
   function create(day,roadPlate){
@@ -121,11 +168,12 @@
       s.clearRect(0,0,W,H);
       // Many closely spaced stops avoid arbitrary gray/pink bands and threshold jumps.
       const gradient=s.createLinearGradient(0,0,0,620);for(let i=0;i<=20;i++)gradient.addColorStop(i/20,`rgb(${mix(skyColor(l,i/20),mix([25,31,44],[151,166,182],l.day),(weather?weather.cloud:0)*.52).map(Math.round).join(',')})`);s.fillStyle=gradient;s.fillRect(0,0,W,H);
-      if(l.sun){s.fillStyle=`rgb(${sunColor(l).join(',')})`;s.beginPath();s.arc(l.x,l.y,18,0,Math.PI*2);s.fill()}
-      paintMoon(s,l);if(weather)CityWeather.paintClouds(s,weather,l,epoch);
+      const visibility=(x,y)=>weather?CityWeather.celestialVisibility(x,y,epoch,weather):1;
+      if(l.sun){s.save();s.globalAlpha=visibility(l.x,l.y);s.fillStyle=`rgb(${sunColor(l).join(',')})`;s.beginPath();s.arc(l.x,l.y,18,0,Math.PI*2);s.fill();s.restore()}
+      paintMoon(s,l,visibility(l.moonX,l.moonY));if(weather)CityWeather.paintClouds(s,weather,l,epoch);
       s.globalCompositeOperation='destination-in';s.drawImage(mask,0,0);s.globalCompositeOperation='source-over';g.drawImage(sky,0,0);nightLights(g,l,epoch,windows);return canvas;
     }
-    return{canvas,render,skyPixels:tail,windowCount:windows.length};
+    return{canvas,render,skyMask:mask,skyPixels:tail,windowCount:windows.length,distantWindowCount:windows.filter(w=>w.strength).length};
   }
-  root.CityEnvironment={create,skyColor,sunColor,surfaceColor,billboardExposure,billboardLight,paintBillboardGlow,windowState,windowColor,groundLightAt,moonSpan,paintMoon,palettes,setPalette};if(typeof module!=='undefined')module.exports=root.CityEnvironment;
+  root.CityEnvironment={create,skyColor,sunColor,surfaceColor,billboardExposure,billboardLight,paintBillboardGlow,windowState,windowColor,groundLightAt,irradianceAt,receiverLight,materialColor,emitterGeometry,distantFacades,moonSpan,paintMoon,palettes,setPalette};if(typeof module!=='undefined')module.exports=root.CityEnvironment;
 })(typeof window==='undefined'?globalThis:window);

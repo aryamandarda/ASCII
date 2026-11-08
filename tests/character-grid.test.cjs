@@ -17,8 +17,8 @@ function canvas(){const c={dataset:{},style:{setProperty(){}},width:0,height:0,c
 class ImageMock {constructor(){this.naturalWidth=240;this.naturalHeight=360;images.push(this)}}
 const elements={art:canvas(),ambient:canvas()};function element(id){return elements[id]||(elements[id]={style:{setProperty(){}},attributes:{},clientWidth:390,clientHeight:844,setAttribute(k,v){this.attributes[k]=v},removeAttribute(){},focus(){}})}
 const win={};vm.runInNewContext(fs.readFileSync('dist/projects/ASCII/nyc/motion-manifest.js','utf8'),{window:win});
-const weather=require('../dist/projects/ASCII/nyc/weather.js');
-const sandbox={CityWeather:{...weather,paintSurfaces(){},paintPrecipitation(){},paintFurnitureSnow(){}},BillboardModel:model,AdDirector:director,CharacterGrid:grid,CityLife:life,CityTraffic:traffic,CityCalendar,Intl,Date,MotionManifest:win.MotionManifest,CityEnvironment:{setPalette(){},palettes:{},paintBillboardGlow(){},billboardExposure:()=>.85,billboardLight:()=>({power:1}),create(){return{render:hour=>({hour}),skyPixels:170000}}},Image:ImageMock,
+const weather=require('../dist/projects/ASCII/nyc/weather.js'),environment=require('../dist/projects/ASCII/nyc/environment.js');
+const sandbox={CityWeather:{...weather,paintSurfaces(){},paintPrecipitation(){},paintFurnitureSnow(){}},BillboardModel:model,AdDirector:director,CharacterGrid:grid,CityLife:life,CityTraffic:traffic,CityCalendar,Intl,Date,MotionManifest:win.MotionManifest,CityEnvironment:{...environment,setPalette(){},palettes:{},paintBillboardGlow(){},billboardExposure:()=>.85,create(){return{render:hour=>({hour}),skyPixels:170000}}},Image:ImageMock,
  document:{hidden:false,querySelectorAll(){return[]},getElementById:element,addEventListener(name,fn){listeners[name]=fn},createElement(tag){assert.equal(tag,'canvas','No hidden autoplay video dependency');return canvas()}},
  ResizeObserver:class{constructor(fn){resizeCallback=fn}observe(){}},
  matchMedia:()=>({matches:false}),performance:{now:()=>0},requestAnimationFrame(fn){nextFrame=fn},setTimeout(fn){fn()},clearTimeout(){}};

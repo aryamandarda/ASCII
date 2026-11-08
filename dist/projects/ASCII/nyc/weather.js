@@ -17,7 +17,7 @@
     const wet=hash(seed+1)<.84,wintry=hash(seed+2)<clamp(c.snowfall*.048,0,.49),summer=c.temperature>19;
     const start=base+(8+hash(seed+3)*30)*HOUR,duration=(summer?5+hash(seed+4)*14:12+hash(seed+4)*24)*HOUR;
     const f={start,end:start+duration,wet,rate:(.15+hash(seed+5)*.50)*c.precipitation/4.1,
-      anomaly:wintry?-c.temperature-2.3-hash(seed+6)*3:(hash(seed+6)-.5)*10,wind:(hash(seed+7)-.5)*2,cloud:wet?.95:.48+hash(seed+8)*.4};
+      anomaly:wintry?-c.temperature-2.3-hash(seed+6)*3:(hash(seed+6)-.5)*10,wind:(hash(seed+7)-.5)*2,cloud:wet?.95:.80+hash(seed+8)*.18};
     fronts.set(slot,f);if(fronts.size>600)fronts.delete(fronts.keys().next().value);return f;
   }
   function conditionsAt(epoch){
@@ -29,7 +29,7 @@
     }
     const hour=mod(epoch/HOUR-5,24),sun=Math.max(0,Math.sin((hour-6)*Math.PI/12)),temperature=c.temperature+anomaly+3.4*(1-cloud*.72)*Math.cos((hour-15)*Math.PI/12);
     const frozen=1-smooth(-.8,1.8,temperature),snow=rate*frozen,rain=rate*(1-frozen);
-    return{temperature,cloud:clamp(cloud,0,1),rain,snow,wind,sun,precipitation:rate,kind:snow>.08?'snow':rain>.08?'rain':cloud>.72?'overcast':cloud>.37?'cloudy':'clear'};
+    return{temperature,cloud:clamp(cloud,0,1),overcast:smooth(.64,.90,cloud),rain,snow,wind,sun,precipitation:rate,kind:snow>.08?'snow':rain>.08?'rain':cloud>.78?'overcast':cloud>.37?'cloudy':'clear'};
   }
   // Snow is a mass balance, in cm, advanced at canonical UTC hourly boundaries.
   // Warm rain, above-freezing air and solar exposure melt it; a cold dry day does
@@ -50,19 +50,29 @@
     while(states.length<=index+1){const i=states.length-1;states.push(integrate(states[i],conditionsAt(start+(i+.5)*HOUR),1))}
     const a=states[index],b=states[index+1];return{...conditionsAt(epoch),roofSnow:mix(a.roof,b.roof,fraction),groundSnow:mix(a.ground,b.ground,fraction),wetness:mix(a.wet,b.wet,fraction)};
   }
-  function cloudDensity(x,y,epoch,cover){const t=epoch/HOUR,drift=t*.20;
-    const n=.56*noise(x/280+drift,y/130+7)+.28*noise(x/130+drift*1.7,y/62+39)+.12*noise(x/53+drift*2.2,y/31+19)+.04*noise(x/22+drift*2.5,y/15+11);
-    return smooth(.76-cover*.48,.96-cover*.60,n)*(.25+.73*cover);
+  function cloudField(x,y,epoch,cover){
+    const drift=epoch/HOUR*.16,perspective=1-.60*clamp(y/680,0,1),X=(x-W*.5)/(240*perspective)+drift,Y=y/165;
+    // Three smooth scales are enough: soft passing patches or a quiet solid
+    // deck. Keep the sky simple and avoid busy, embossed cloud textures.
+    const broad=noise(X,Y+7),detail=.65*noise(X*2.03+31,Y*2.03+17)+.35*noise(X*4.07+53,Y*4.07+3);
+    const mass=.65*broad+.35*detail,bank=smooth(.61-cover*.23,.80-cover*.23,mass)*smooth(.18,.40,cover),deck=smooth(.64,.90,cover);
+    // Overcast is a continuous optically thick deck. Gaps in its lower layer
+    // reveal another cloud layer, never punched-out blue sky or a sharp sun.
+    const optical=deck*(5.0+1.5*broad)+bank*(2.2+cover*3.2)+deck*.55*detail;
+    return{opacity:1-Math.exp(-optical),optical,mass,detail,deck};
   }
+  const cloudDensity=(x,y,epoch,cover)=>cloudField(x,y,epoch,cover).opacity;
+  function celestialVisibility(x,y,epoch,w){const transmission=Math.exp(-cloudField(x,y,epoch,w.cloud).optical*1.8);return transmission<.005?0:transmission}
   let cloudCanvas,cloudCtx,cloudPixels;
   function paintClouds(g,w,l,epoch){
     if(!cloudCanvas){cloudCanvas=document.createElement('canvas');cloudCanvas.width=192;cloudCanvas.height=94;cloudCtx=cloudCanvas.getContext('2d');cloudPixels=cloudCtx.createImageData(192,94)}
     const data=cloudPixels.data;
-    for(let y=0;y<94;y++)for(let x=0;x<192;x++){const X=(x+.5)*W/192,Y=(y+.5)*620/94,d=cloudDensity(X,Y,epoch,w.cloud),i=(y*192+x)*4;
-      const edge=cloudDensity(X-14,Y-10,epoch,w.cloud),silver=clamp((d-edge)*3,-.25,.25),brightness=(.70+silver-d*.12);
-      const day=[198,208,219],night=[61,67,84];
-      for(let c=0;c<3;c++)data[i+c]=mix(night[c],day[c],l.day)*brightness+(l.warm*(1-w.cloud)*[28,13,7][c]);
-      data[i+3]=Math.round(d*255);
+    for(let y=0;y<94;y++)for(let x=0;x<192;x++){const X=(x+.5)*W/192,Y=(y+.5)*620/94,f=cloudField(X,Y,epoch,w.cloud),i=(y*192+x)*4;
+      const storm=clamp(w.precipitation/.6,0,1);
+      const brightness=.96-f.mass*(.15-f.deck*.09)+(f.detail-.5)*(.11-f.deck*.07)-f.deck*.12-storm*.09;
+      const day=[231,237,242],night=[49,57,72];
+      for(let c=0;c<3;c++)data[i+c]=mix(night[c],day[c],l.day)*brightness+(l.warm*(1-f.deck)*[25,11,4][c]);
+      data[i+3]=Math.round(f.opacity*255);
     }
     cloudCtx.putImageData(cloudPixels,0,0);g.save();g.imageSmoothingEnabled=true;g.drawImage(cloudCanvas,0,0,W,620);g.restore();
   }
@@ -117,6 +127,6 @@
       }
     }g.restore();
   }
-  root.CityWeather={normals,climate,front,conditionsAt,weatherAt,integrate,cloudDensity,paintClouds,paintSurfaces,paintPrecipitation,paintFurnitureSnow,snowCoverage,ledges,noise};
+  root.CityWeather={normals,climate,front,conditionsAt,weatherAt,integrate,cloudField,cloudDensity,celestialVisibility,paintClouds,paintSurfaces,paintPrecipitation,paintFurnitureSnow,snowCoverage,ledges,noise};
   if(typeof module!=='undefined')module.exports=root.CityWeather;
 })(typeof window==='undefined'?globalThis:window);

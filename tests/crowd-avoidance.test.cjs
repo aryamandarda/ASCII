@@ -3,11 +3,11 @@ global.SunCalc=require('../dist/projects/ASCII/nyc/vendor/suncalc.js');
 global.CityCalendar=require('../dist/projects/ASCII/nyc/calendar.js');
 const L=require('../dist/projects/ASCII/nyc/city-life.js'),C=CityCalendar;
 const start=C.localEpoch('2026-11-07',1080)/60000;
-let moving=0,near=0;const styles=new Set(),intervals=new Set();
+let moving=0,near=0;const styles=new Set(),intervals=new Set(),speeds=new Set();
 for(let dt=0;dt<=180;dt+=.125){
  const people=L.peopleAt(start+dt);
  for(let i=0;i<people.length;i++){
-  const p=people[i];styles.add(p.stride.toFixed(2));intervals.add(p.paceInterval.toFixed(1));
+  const p=people[i];speeds.add(p.speed.toFixed(2));assert(p.speed<=1);assert(Math.hypot(p.vx,p.vz)<=1.001);styles.add(p.stride.toFixed(2));intervals.add(p.paceInterval.toFixed(1));
   if(Math.hypot(p.vx,p.vz)>.1)moving++;
   for(let j=i+1;j<people.length;j++){
    const q=people[j],d=Math.hypot(p.ground[0]-q.ground[0],p.ground[1]-q.ground[1]);
@@ -17,7 +17,7 @@ for(let dt=0;dt<=180;dt+=.125){
   for(const o of L.obstacles)if(o.id!==p.tableId)assert(Math.hypot(p.ground[0]-o.p[0],p.ground[1]-o.p[1])>=o.radius+p.radius-.015,'People must route around seating');
  }
 }
-assert(moving>1000&&near>100);assert(styles.size>12&&intervals.size>12);
+assert(moving>1000&&near>100);assert(speeds.size>25,'Personal speeds must vary substantially');assert(styles.size>12&&intervals.size>12);
 assert(L.densityMultiplier(.9)>L.densityMultiplier(.25)*1.8);
 assert(L.body.hip>L.body.waist&&L.body.waist>L.body.shoulder);
 const gaps=L.tables.slice(1).map((t,i)=>t.x-L.tables[i].x);assert(Math.max(...gaps)-Math.min(...gaps)>30,'Table spacing should vary');

@@ -3,7 +3,7 @@ const R=require('../dist/projects/ASCII/nyc/pedestrian-rig.js');
 const distance=(a,b)=>Math.hypot(...a.map((v,i)=>v-b[i]));
 const kneeAngle=l=>180-Math.acos(Math.max(-1,Math.min(1,l.hip.map((v,i)=>v-l.knee[i]).reduce((s,v,i)=>s+v*(l.ankle[i]-l.knee[i]),0)/(R.body.thigh*R.body.shank))))*180/Math.PI;
 let peak=0;
-for(const height of [.93,1,1.07])for(const stride of [1.25,1.35,1.41])for(const seated of [0,.25,.5,1])for(let phase=0;phase<Math.PI*2;phase+=.04){
+for(const height of [.93,1,1.07])for(const stride of [.98,1.18,1.25,1.35,1.41])for(const seated of [0,.25,.5,1])for(let phase=0;phase<Math.PI*2;phase+=.04){
  const r=R.pose({step:phase,height,stride,seated,heading:.8});
  for(const leg of r.legs){assert(Math.abs(distance(leg.hip,leg.knee)-R.body.thigh)<1e-8,'Thigh cannot stretch');assert(Math.abs(distance(leg.knee,leg.ankle)-R.body.shank)<1e-8,'Shin cannot stretch');assert(leg.knee[2]>=Math.min(leg.hip[2],leg.ankle[2]),'Knees bend forward');if(!seated&&height===1&&stride===1.35)peak=Math.max(peak,kneeAngle(leg))}
  for(const arm of r.arms){assert(Math.abs(distance(arm.shoulder,arm.elbow)-R.body.upperArm)<.001);assert(Math.abs(distance(arm.elbow,arm.wrist)-R.body.forearm)<1e-8)}
@@ -21,3 +21,10 @@ assert(Math.abs(R.turnTowards(Math.PI-.01,-Math.PI+.01,.1)-(Math.PI+.01))<1e-10,
 assert(Math.abs(R.turnTowards(0,Math.PI,.1))<=.160001,'Heading has a bounded angular speed');
 const cadence=120*1.20/1.35;assert(cadence>100&&cadence<115);
 console.log('PASS: fixed limb lengths, 60/40 gait timing, planted stance feet, continuous contact, realistic knee flexion, attached skull and bounded turning.');
+
+// Closed shells must retain projected area at every bearing, especially profile.
+const polygonArea=p=>Math.abs(p.reduce((sum,a,i)=>{const b=p[(i+1)%p.length];return sum+a[0]*b[1]-b[0]*a[1]},0))/2;
+for(let yaw=0;yaw<Math.PI*2;yaw+=.025){
+ assert(R.torsoMesh(false).reduce((sum,f)=>sum+polygonArea(f.points.map(p=>R.project(p,yaw))),0)>.035,'Torso must not disappear sideways');
+ assert(R.neckMesh().reduce((sum,f)=>sum+polygonArea(f.points.map(p=>R.project(p,yaw))),0)>.0015,'Neck must have solid sides');
+}
