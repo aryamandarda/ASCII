@@ -13,7 +13,9 @@ Times Square as a living character canvas. Neon billboards trade places, the sky
 - Red plaza seating and two-way traffic with headlights, brake lights, and reflections.
 - A minimal immersive view with glass controls, built for desktop and mobile.
 
-Built with vanilla JavaScript and Canvas 2D. No framework, backend, API keys, or build step.
+Built with vanilla JavaScript and Canvas 2D. No frontend framework or build step. A small Cloudflare Worker and Durable Object persist anonymous likes; the artwork itself stays static.
+
+A heart button shows the shared like count. Tap to like or unlike. An anonymous browser cookie remembers your choice; clearing cookies or changing devices creates a new identity. Counts are reactions, not verified unique people.
 
 ## Run locally
 

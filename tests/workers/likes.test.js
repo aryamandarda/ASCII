@@ -1,0 +1,38 @@
+import { env, exports } from 'cloudflare:workers';
+import { expect, test } from 'vitest';
+const url='https://example.com/api/likes/nyc';
+const get=(cookie)=>exports.default.fetch(url,{headers:cookie?{Cookie:cookie}:{}});
+const vote=(cookie,liked,origin='https://example.com')=>exports.default.fetch(url,{method:'POST',headers:{Cookie:cookie,Origin:origin,'Content-Type':'application/json'},body:JSON.stringify({liked})});
+test('shared count, idempotent retries, independent visitors, unlike and cookie persistence',async()=>{
+ const a=await get(),cookie=a.headers.get('set-cookie').split(';')[0],initial=(await a.json()).count;
+ expect(a.headers.get('set-cookie')).toContain('HttpOnly');expect(a.headers.get('cache-control')).toBe('no-store');
+ const results=await Promise.all(Array.from({length:12},()=>vote(cookie,true)));
+ for(const r of results)expect(await r.json()).toEqual({count:initial+1,liked:true});
+ expect(await (await get(cookie)).json()).toEqual({count:initial+1,liked:true});
+ const b=await get(),cookieB=b.headers.get('set-cookie').split(';')[0];expect(await b.json()).toEqual({count:initial+1,liked:false});
+ expect(await (await vote(cookieB,true)).json()).toEqual({count:initial+2,liked:true});
+ expect(await (await vote(cookie,false)).json()).toEqual({count:initial+1,liked:false});
+ expect(await (await vote(cookie,false)).json()).toEqual({count:initial+1,liked:false});
+ await vote(cookieB,false);
+ expect((await (await get(cookie)).json()).count).toBe(initial);
+});
+test('rejects cross-origin, missing cookies, invalid input and methods',async()=>{
+ const r=await get(),cookie=r.headers.get('set-cookie').split(';')[0];
+ expect((await vote(cookie,true,'https://elsewhere.com')).status).toBe(403);
+ expect((await vote('',true)).status).toBe(409);
+ expect((await vote(cookie,'yes')).status).toBe(400);
+ expect((await exports.default.fetch(url,{method:'DELETE'})).status).toBe(405);
+ expect((await exports.default.fetch(url,{method:'POST',headers:{Cookie:cookie,Origin:'https://example.com','Content-Type':'application/json'},body:JSON.stringify({liked:true,junk:'x'.repeat(200)})})).status).toBe(400);
+});
+test('artworks have independent state and concurrent distinct likes are not lost',async()=>{
+ const name=crypto.randomUUID(),object=env.ARTWORK_LIKES.getByName(name),ids=Array.from({length:20},()=>crypto.randomUUID());
+ await Promise.all(ids.map(id=>object.setLike(id,true)));
+ expect(await env.ARTWORK_LIKES.getByName(name).snapshot(ids[0])).toEqual({count:20,liked:true});
+ expect(await env.ARTWORK_LIKES.getByName(name+'-other').snapshot(ids[0])).toEqual({count:0,liked:false});
+ await Promise.all(ids.map(id=>object.setLike(id,false)));
+ expect((await object.snapshot(ids[0])).count).toBe(0);
+});
+test('both entrypoints and artwork assets remain available',async()=>{
+ for(const path of ['/','/projects/ASCII/nyc/']){const r=await exports.default.fetch('https://example.com'+path);expect(r.status).toBe(200);expect(await r.text()).toContain('id="likeCount"')}
+ const js=await exports.default.fetch('https://example.com/projects/ASCII/nyc/likes.js');expect(js.status).toBe(200);expect(js.headers.get('content-type')).toContain('javascript');
+});

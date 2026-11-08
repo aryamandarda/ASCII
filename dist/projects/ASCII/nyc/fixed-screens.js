@@ -92,7 +92,7 @@ const gridObserver=new ResizeObserver(()=>{clearTimeout(resizeTimer);resizeTimer
 gridObserver.observe(el('surface'));
 let controlsHidden=false;
 function showControls(show){
-  controlsHidden=!show;el('controls').hidden=!show;el('leave').hidden=!show;
+  controlsHidden=!show;el('likeWidget').hidden=!show;el('controls').hidden=!show;el('leave').hidden=!show;
   el('controlsToggle').setAttribute('aria-expanded',String(show));
   el('controlsToggle').setAttribute('aria-label',show?'Hide controls':'Show controls');
   el('controlsToggle').title=show?'Hide controls (H)':'Show controls (H)';
@@ -111,7 +111,7 @@ el('weather').onclick=()=>{const open=el('weatherOptions').hidden;el('skyOptions
 document.querySelectorAll('[data-weather]').forEach(b=>b.onclick=()=>{weatherMode=b.dataset.weather;document.querySelectorAll('[data-weather]').forEach(option=>option.setAttribute('aria-pressed',String(option.dataset.weather===weatherMode)));el('weather').title='Weather: '+b.textContent;closeWeather();el('weather').focus({preventScroll:true});draw()});
 el('date').onchange=()=>{if(!/^\d{4}-\d{2}-\d{2}$/.test(el('date').value))return;epoch=CityCalendar.localEpoch(el('date').value,Math.floor(CityCalendar.parts(epoch).hour*60));draw()};
 function enter(){immersed=true;el('controlsToggle').hidden=false;showControls(true);el('immerse').setAttribute('tabindex','-1');el('immerse').setAttribute('aria-hidden','true');requestAnimationFrame(()=>document.body.classList.add('immersed'));el('leave').focus({preventScroll:true});const request=document.documentElement.requestFullscreen;if(request&&!document.fullscreenElement){const p=request.call(document.documentElement);if(p&&p.catch)p.catch(()=>{})}}
-function leave(){immersed=false;el('controlsToggle').hidden=true;document.body.classList.remove('immersed');el('controls').hidden=true;el('leave').hidden=true;el('immerse').removeAttribute('tabindex');el('immerse').removeAttribute('aria-hidden');el('immerse').focus({preventScroll:true});if(document.fullscreenElement&&document.exitFullscreen)document.exitFullscreen().catch(()=>{})}
+function leave(){immersed=false;el('likeWidget').hidden=false;el('controlsToggle').hidden=true;document.body.classList.remove('immersed');el('controls').hidden=true;el('leave').hidden=true;el('immerse').removeAttribute('tabindex');el('immerse').removeAttribute('aria-hidden');el('immerse').focus({preventScroll:true});if(document.fullscreenElement&&document.exitFullscreen)document.exitFullscreen().catch(()=>{})}
 el('immerse').onclick=enter;el('leave').onclick=leave;
 document.addEventListener('keydown',event=>{if(event.key==='Escape'&&immersed)leave();if(event.key.toLowerCase()==='h'&&immersed&&!['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)&&!document.activeElement.isContentEditable){event.preventDefault();showControls(controlsHidden)}if(event.code==='Space'&&immersed&&!['INPUT','BUTTON','SELECT','TEXTAREA'].includes(document.activeElement.tagName)){event.preventDefault();el('play').click()}});
 document.addEventListener('visibilitychange',()=>{last=0;if(!document.hidden)draw()});

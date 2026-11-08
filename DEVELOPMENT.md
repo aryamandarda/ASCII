@@ -1,6 +1,10 @@
 # Development
 
-This is a self-contained static artwork. There is no dependency installation or frontend build step.
+The artwork is static. Shared likes use the Worker in `worker/index.js` and one SQLite-backed Durable Object per artwork, configured in `wrangler.jsonc`. There is no separate database service or frontend build step.
+
+For the complete app including persisted local likes, run `npm ci` and `npm run dev:worker`. Run `npm run test:worker` for Workers-runtime tests of concurrent likes, retry deduplication, unlike, cookie state, input rejection, and asset routing. `npm test` runs the existing artwork checks. Plain static/offline previews show an unavailable count and keep the artwork usable.
+
+The live endpoint is `/api/likes/nyc`. Only a random browser ID is stored with each active like; no IP address, name, or email is stored in the counter. Cookie expiry is one year. This is a lightweight reaction counter, not an identity or bot-verification system. Production data persists across code deployments.
 
 Serve `dist` with an HTTP server, for example:
 
