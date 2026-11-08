@@ -7,8 +7,9 @@ Interactive city portraits, rendered in characters.
 Times Square as a living character canvas. Neon billboards trade places, the sky follows a New York calendar, and pedestrians and traffic move through a fixed street-level view.
 
 - Ten billboard creatives, animated campaigns, and coordinated screen takeovers.
-- Date-aware sunrise and sunset, four twilight palettes, and individually lit windows.
-- Pedestrians with varied gait, personal space, and time-of-day crowd density.
+- Date-aware sunrise, sunset and moon phases, four twilight palettes, and individually lit windows.
+- Seasonal rain, drifting clouds, snowfall, and snow that accumulates and thaws across days.
+- Pedestrians with a proportioned skeleton, distance-driven gait, personal space, and time-of-day crowd density.
 - Red plaza seating and two-way traffic with headlights, brake lights, and reflections.
 - A minimal immersive view with glass controls, built for desktop and mobile.
 
@@ -26,7 +27,7 @@ Open [localhost:8000/projects/ASCII/nyc/](http://localhost:8000/projects/ASCII/n
 
 ## Explore
 
-Select **Immerse** to enter the artwork. Use the date and time controls to explore the scene, the sunset icon to choose a palette, and the playback controls to pause or reverse time.
+Select **Immerse** to enter the artwork. Use the date and time controls to explore the scene, the sunset icon to choose a palette, and the playback controls to pause or reverse time. Use **Hide controls** or **H** for a clear view.
 
 Speeds range from **0.5× to 5×**. At 1×, five simulated minutes pass in five seconds. People, traffic, billboards, and lighting follow the same clock. Reduced-motion preferences are respected.
 
@@ -40,7 +41,7 @@ Run the regression checks with Node.js 20 or later and FFmpeg installed:
 npm test
 ```
 
-The checks cover the character pipeline, calendar and daylight calculations, billboard sequencing, crowd movement, and traffic. No package installation is required.
+The checks cover the character pipeline, calendar and daylight calculations, billboard sequencing, gait mechanics, crowd movement, traffic, and seasonal weather. See [movement and weather mechanics](docs/movement-weather.md) for dimensions, equations, references, and the local review. No package installation is required.
 
 ## Credits
 

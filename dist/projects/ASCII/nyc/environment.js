@@ -18,7 +18,7 @@
   function sunColor(light){const w=light.warm;return[255,Math.round(215-w*48),28]}
   function srgbToLinear(v){v/=255;return v<=.04045?v/12.92:((v+.055)/1.055)**2.4}
   function linearToSrgb(v){return Math.round(255*(v<=.0031308?12.92*v:1.055*v**(1/2.4)-.055))}
-  function surfaceColor(rgb,light){const l=light,exposure=.32+.68*l.day,tint=[.88+.12*l.day,.94+.06*l.day,1];return rgb.map((v,i)=>linearToSrgb(srgbToLinear(v)*exposure*tint[i]))}
+  function surfaceColor(rgb,light){const l=light,exposure=(.32+.68*l.day)*(1-(l.cloud||0)*.23*l.day),tint=[.88+.12*l.day,.94+.06*l.day,1];return rgb.map((v,i)=>linearToSrgb(srgbToLinear(v)*exposure*tint[i]))}
   const billboardExposure=light=>.85*light.night;
   function billboardLight(points,rgb){
     const xs=points.map(p=>p[0]),ys=points.map(p=>p[1]),w=Math.max(...xs)-Math.min(...xs),h=Math.max(...ys)-Math.min(...ys);
@@ -96,6 +96,14 @@
   function nightLights(g,l,epoch,windows){
     for(const w of windows){const on=windowState(w.id,epoch,l)*l.night;if(on<.01)continue;g.globalAlpha=on*.87;g.shadowColor=`rgb(${w.color.join(',')})`;g.shadowBlur=4;g.drawImage(w.tile,w.x,w.y)}g.shadowBlur=0;g.globalAlpha=1;
   }
+  function moonSpan(y,phase,fraction){const edge=Math.sqrt(Math.max(0,1-y*y)),terminator=(1-2*fraction)*edge;return phase<.5?[terminator,edge]:[-edge,-terminator]}
+  function paintMoon(g,l){
+    if(!l.moon)return;const angle=l.moonAngle-Math.PI/2+(l.moonPhase<.5?0:Math.PI),c=Math.cos(angle),s=Math.sin(angle),r=15;
+    const point=(x,y)=>[l.moonX+r*(x*c-y*s),l.moonY+r*(x*s+y*c)];
+    const outline=[];for(let i=0;i<=48;i++){const y=-1+i/24;outline.push(point(moonSpan(y,l.moonPhase,l.moonFraction)[1],y))}
+    for(let i=48;i>=0;i--){const y=-1+i/24;outline.push(point(moonSpan(y,l.moonPhase,l.moonFraction)[0],y))}
+    g.save();g.globalAlpha=.23+.77*l.night;g.fillStyle='#e9e9d6';g.beginPath();outline.forEach((p,i)=>i?g.lineTo(...p):g.moveTo(...p));g.closePath();g.fill();g.restore();
+  }
   function makeCanvas(){const c=document.createElement('canvas');c.width=W;c.height=H;return c}
   function create(day,roadPlate){
     const canvas=makeCanvas(),g=canvas.getContext('2d'),sky=makeCanvas(),s=sky.getContext('2d'),mask=makeCanvas(),m=mask.getContext('2d',{willReadFrequently:true});
@@ -104,18 +112,20 @@
     const blue=k=>{let i=k*4;return k<W*620&&a[i]>80&&a[i]<215&&a[i+1]>135&&a[i+2]>220&&a[i+1]>a[i]+18&&a[i+2]>a[i+1]+12};
     while(head<tail){const k=queue[head++],x=k%W;for(const n of [x>0?k-1:-1,x<W-1?k+1:-1,k>=W?k-W:-1,k+W<W*H?k+W:-1])if(n>=0&&!seen[n]&&blue(n)){seen[n]=1;queue[tail++]=n}}
     const maskPixels=m.createImageData(W,H);for(let i=0;i<seen.length;i++){maskPixels.data[i*4]=maskPixels.data[i*4+1]=maskPixels.data[i*4+2]=255;maskPixels.data[i*4+3]=seen[i]?255:0}m.putImageData(maskPixels,0,0);
-    const lit=g.createImageData(W,H),windows=extractWindows(source);let cached=-1;
-    function render(epoch){const key=Math.floor(epoch/60000)+paletteId;if(key===cached)return canvas;cached=key;const l=CityCalendar.lightAt(epoch),lut=[[],[],[]];
+    const lit=g.createImageData(W,H),windows=extractWindows(source),base=makeCanvas(),baseContext=base.getContext('2d');let cached=-1,frameKey=null;
+    function render(epoch,weather){const frame=Math.floor(epoch/15000)+paletteId;if(frameKey===frame)return canvas;frameKey=frame;const key=Math.floor(epoch/60000)+paletteId,l={...CityCalendar.lightAt(epoch),cloud:weather?weather.cloud:0},lut=[[],[],[]];
+      if(key!==cached){cached=key;
       for(let v=0;v<256;v++){const rgb=surfaceColor([v,v,v],l);for(let c=0;c<3;c++)lut[c][v]=rgb[c]}
-      for(let i=0;i<a.length;i+=4){lit.data[i]=lut[0][a[i]];lit.data[i+1]=lut[1][a[i+1]];lit.data[i+2]=lut[2][a[i+2]];lit.data[i+3]=255}g.putImageData(lit,0,0);
+      for(let i=0;i<a.length;i+=4){lit.data[i]=lut[0][a[i]];lit.data[i+1]=lut[1][a[i+1]];lit.data[i+2]=lut[2][a[i+2]];lit.data[i+3]=255}baseContext.putImageData(lit,0,0);}
+      g.drawImage(base,0,0);
       s.clearRect(0,0,W,H);
       // Many closely spaced stops avoid arbitrary gray/pink bands and threshold jumps.
-      const gradient=s.createLinearGradient(0,0,0,620);for(let i=0;i<=20;i++)gradient.addColorStop(i/20,`rgb(${skyColor(l,i/20).join(',')})`);s.fillStyle=gradient;s.fillRect(0,0,W,H);
+      const gradient=s.createLinearGradient(0,0,0,620);for(let i=0;i<=20;i++)gradient.addColorStop(i/20,`rgb(${mix(skyColor(l,i/20),mix([25,31,44],[151,166,182],l.day),(weather?weather.cloud:0)*.52).map(Math.round).join(',')})`);s.fillStyle=gradient;s.fillRect(0,0,W,H);
       if(l.sun){s.fillStyle=`rgb(${sunColor(l).join(',')})`;s.beginPath();s.arc(l.x,l.y,18,0,Math.PI*2);s.fill()}
-      if(l.moon){s.fillStyle='#f4edc8';s.beginPath();s.arc(l.moonX,l.moonY,15,0,Math.PI*2);s.fill();s.fillStyle=`rgb(${skyColor(l,l.moonY/620).join(',')})`;s.beginPath();s.arc(l.moonX+7,l.moonY-4,13,0,Math.PI*2);s.fill()}
+      paintMoon(s,l);if(weather)CityWeather.paintClouds(s,weather,l,epoch);
       s.globalCompositeOperation='destination-in';s.drawImage(mask,0,0);s.globalCompositeOperation='source-over';g.drawImage(sky,0,0);nightLights(g,l,epoch,windows);return canvas;
     }
     return{canvas,render,skyPixels:tail,windowCount:windows.length};
   }
-  root.CityEnvironment={create,skyColor,sunColor,surfaceColor,billboardExposure,billboardLight,paintBillboardGlow,windowState,windowColor,groundLightAt,palettes,setPalette};if(typeof module!=='undefined')module.exports=root.CityEnvironment;
+  root.CityEnvironment={create,skyColor,sunColor,surfaceColor,billboardExposure,billboardLight,paintBillboardGlow,windowState,windowColor,groundLightAt,moonSpan,paintMoon,palettes,setPalette};if(typeof module!=='undefined')module.exports=root.CityEnvironment;
 })(typeof window==='undefined'?globalThis:window);

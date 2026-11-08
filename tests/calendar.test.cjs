@@ -11,7 +11,7 @@ for(const speed of [.5,1,2,3,5])assert.equal(C.advance(end,5,speed)-end,5*60000*
 // DST is an actual New York calendar, not a fixed UTC offset.
 assert.equal(C.parts(Date.parse('2027-03-14T06:59:00Z')).hour,1+59/60);assert.equal(C.parts(Date.parse('2027-03-14T07:00:00Z')).hour,3);
 assert.equal(C.parts(Date.parse('2026-11-01T05:59:00Z')).hour,1+59/60);assert.equal(C.parts(Date.parse('2026-11-01T06:00:00Z')).hour,1);
-assert.equal(C.lightAt(C.localEpoch('2026-11-07',720)).sun,true);assert.equal(C.lightAt(C.localEpoch('2026-11-07',1380)).moon,true);
+assert.equal(C.lightAt(C.localEpoch('2026-11-07',720)).sun,true);const lunar=C.lightAt(C.localEpoch('2026-11-07',1380));assert.equal(lunar.moon,lunar.moonAltitude>0&&lunar.moonFraction>.004,'Do not force a moon into every night');
 const t=C.localEpoch('2026-11-07',1080)/60000,before=L.peopleAt(t),again=L.peopleAt(t+.1);const index=new Map(again.map(p=>[p.id,p]));
 for(const p of before.filter(p=>p.seat===undefined&&p.x>0&&p.x<1280)){assert(index.has(p.id),'Visible walkers cannot be removed by a lower arrival target');const q=index.get(p.id);const a=L.unproject([p.x,p.y]),b=L.unproject([q.x,q.y]);assert(Math.hypot(b[0]-a[0],b[1]-a[1])<=p.speed*.101,'Speed stays continuous in ground-plane meters')}
 const fingerprint=people=>people.map(p=>[p.id,p.x,p.y,p.step]);L.peopleAt(t+400);assert.deepEqual(fingerprint(L.peopleAt(t)),fingerprint(before),'Rewinding reproduces the same people and cadence');

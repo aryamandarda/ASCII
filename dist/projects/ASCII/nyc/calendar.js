@@ -27,9 +27,13 @@
   }
   function lightAt(ms){const p=parts(ms),e=events(p.date),rise=+e.sunrise,set=+e.sunset,noon=+e.solarNoon,alt=solar(ms).altitude;
     const day=smooth(-6,12,alt),warm=smooth(-7,-1,alt)*(1-smooth(3,13,alt)),sun=ms>=rise&&ms<=set,progress=clamp((ms-rise)/(set-rise),0,1);
-    const before=ms<rise,nightStart=before?+events(shiftDate(p.date,-1)).sunset:set,nightEnd=before?rise:+events(shiftDate(p.date,1)).sunrise;
-    const lunarProgress=clamp((ms-nightStart)/(nightEnd-nightStart),0,1),moon=!sun&&alt<-2;
-    return{...p,day,night:1-day,warm,elevation:alt,sun,morning:ms<noon,x:365+progress*575,y:590-Math.sin(progress*Math.PI)*495,moon,moonX:370+lunarProgress*560,moonY:590-Math.sin(lunarProgress*Math.PI)*455,moonPhase:SunCalc.getMoonIllumination(new Date(ms)).phase,sunrise:rise,sunset:set};
+    const lunar=SunCalc.getMoonIllumination(new Date(ms)),position=SunCalc.getMoonPosition(new Date(ms),lat,lon);
+    // The disc exists above the real lunar horizon, including daytime moons.
+    // Position is artistically fitted into the photograph's visible sky opening.
+    const moon=position.altitude>0&&lunar.fraction>.004;
+    return{...p,day,night:1-day,warm,elevation:alt,sun,morning:ms<noon,x:365+progress*575,y:590-Math.sin(progress*Math.PI)*495,
+      moon,moonX:640+Math.sin(position.azimuth)*265,moonY:590-clamp(position.altitude/(Math.PI/2),0,1)*530,
+      moonPhase:lunar.phase,moonFraction:lunar.fraction,moonAngle:lunar.angle-position.parallacticAngle,moonAltitude:position.altitude,sunrise:rise,sunset:set};
   }
   function advance(epoch,seconds,speed=1,direction=1){return epoch+seconds*MINUTE*speed*direction}
   root.CityCalendar={lat,lon,zone,MINUTE,DAY,parts,localEpoch,shiftDate,events,solar,lightAt,advance};if(typeof module!=='undefined')module.exports=root.CityCalendar;

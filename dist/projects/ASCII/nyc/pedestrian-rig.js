@@ -1,0 +1,114 @@
+(function(root){
+  'use strict';
+  const TAU=Math.PI*2,clamp=(x,a,b)=>Math.max(a,Math.min(b,x)),mix=(a,b,t)=>a+(b-a)*t;
+  const mod=(x,n)=>((x%n)+n)%n,smooth=x=>{x=clamp(x,0,1);return x*x*(3-2*x)};
+  // Height-normalized adult landmarks, not a set of independently moving sprites.
+  // Joint centres: thigh 24.5%, shank 24.6%, upper arm 18.6%, forearm 14.6%.
+  // See docs/movement-weather.md for measured reference ranges and approximations.
+  const body={headTop:-1,headCenter:-.934,headRadius:.064,neckTop:-.883,neckBottom:-.850,
+    shoulder:-.826,waist:-.565,hip:-.510,knee:-.270,ankle:-.039,hipWidth:.052,
+    thigh:.245,shank:.246,upperArm:.186,forearm:.146,foot:.145,shoulderWidth:.226};
+  const angleDelta=(a,b)=>Math.atan2(Math.sin(b-a),Math.cos(b-a));
+  function turnTowards(a,b,dt){return a+clamp(angleDelta(a,b),-1.6*dt,1.6*dt)}
+  // A foot stays in stance for 60% of a complete stride. During stance its
+  // displacement is -distance travelled, cancelling the root's forward motion.
+  // Swing is a C1 Hermite return with matching velocities at heel strike/toe-off.
+  function footCycle(phase,stride=1.35,height=1.75){
+    const u=mod(phase/TAU,1),length=stride/height,span=length*.60;
+    let forward,lift,roll;
+    if(u<.60){forward=span/2-length*u;lift=.012*(1-smooth(u/.12))+.045*smooth((u-.43)/.17);roll=-.30*(1-smooth(u/.12))+.46*smooth((u-.43)/.17)}
+    else{const t=(u-.6)/.4,t2=t*t,t3=t2*t;
+      forward=(2*t3-3*t2+1)*(-span/2)+(t3-2*t2+t)*(-length*.4)+(-2*t3+3*t2)*(span/2)+(t3-t2)*(-length*.4);
+      lift=.045*(1-smooth(t))+.012*smooth((t-.75)/.25)+.045*Math.sin(Math.PI*t)**2;roll=mix(.46,-.30,smooth(t));
+    }
+    return{u,forward,lift,roll,stance:u<.60};
+  }
+  function solveKnee(hip,ankle){
+    const df=ankle[2]-hip[2],dy=ankle[1]-hip[1],d=Math.hypot(df,dy),a=body.thigh,b=body.shank;
+    const along=(a*a-b*b+d*d)/(2*d),bend=Math.sqrt(Math.max(0,a*a-along*along));
+    return[hip[0],hip[1]+dy*along/d-df*bend/d,hip[2]+df*along/d+dy*bend/d];
+  }
+  function pose(p){
+    const phase=p.step||0,sit=clamp(p.seated||0,0,1),height=1.75*(p.height||1),stride=p.stride||1.35;
+    const walking=clamp(p.locomotion===undefined?1:p.locomotion,0,1)*(1-sit);
+    const feet=[-1,1].map((side,i)=>({side,...footCycle(phase+i*Math.PI,stride,height)}));
+    // Solve pelvis height from the weight-bearing limb, keeping both leg lengths
+    // fixed. Double support limits extension instead of stretching the shins.
+    let hipHeight=.505;
+    const supports=feet.filter(f=>f.stance);
+    if(supports.length)hipHeight=Math.min(...supports.map(f=>{
+      const loading=.009*Math.sin(Math.PI*clamp(f.u/.20,0,1))**2;
+      return .039+f.lift+Math.sqrt(Math.max(.01,(body.thigh+body.shank-.004-loading)**2-f.forward*f.forward));
+    }));
+    hipHeight=Math.min(hipHeight,...feet.map(f=>.039+f.lift+Math.sqrt(Math.max(.01,(body.thigh+body.shank-.002)**2-f.forward*f.forward))));
+    hipHeight=mix(.505,hipHeight,walking);
+    const drop=(.510-hipHeight)*(1-sit)+.205*sit,sway=Math.sin(phase)*.005*walking;
+    const yaw=p.heading===undefined?Math.atan2(p.dx||1,-(p.vz||-.2)):p.heading;
+    const build=p.build||1;
+    const hip=[sway,body.hip+drop,0],shoulder=[sway*.45,body.shoulder+drop, .012*walking];
+    const legs=feet.map(f=>{
+      const joint=[hip[0]+f.side*body.hipWidth*build,hip[1],0];
+      const ankle=[joint[0],mix(body.ankle-f.lift*walking,-.039,sit),mix(f.forward*walking,.22,sit)];
+      // Seated ankles stay under bent knees; the same IK keeps segment lengths.
+      const knee=solveKnee(joint,ankle);
+      return{side:f.side,hip:joint,knee,ankle,stance:f.stance,roll:f.roll*walking};
+    });
+    const arms=[-1,1].map((side,i)=>{
+      const a=phase+i*Math.PI,angle=-clamp(feet[i].forward/(stride/height*.30),-1,1)*.32*walking*(p.armSwing||1),elbowFlex=.22+.20*(.5+.5*Math.cos(a));
+      const shoulderJoint=[shoulder[0]+side*.112*build,shoulder[1]+.015,shoulder[2]];
+      const upper=mix(angle,-.53,sit),lower=mix(angle+elbowFlex,-1.35,sit);
+      const elbow=[shoulderJoint[0]+side*.012,shoulderJoint[1]+Math.sqrt(body.upperArm**2-.012**2)*Math.cos(upper),shoulderJoint[2]+Math.sqrt(body.upperArm**2-.012**2)*Math.sin(upper)];
+      const wrist=[elbow[0],elbow[1]+body.forearm*Math.cos(lower),elbow[2]+body.forearm*Math.sin(lower)];
+      return{side,shoulder:shoulderJoint,elbow,wrist};
+    });
+    // Head and hair share one frame. No direction threshold, independent hair
+    // offsets or per-frame randomness. Very small, continuous gaze anticipation.
+    const head=[shoulder[0],body.headCenter+drop,shoulder[2]],headYaw=yaw+.07*Math.sin((p.travelled||0)*.18+(p.phase||0));
+    return{hip,shoulder,head,yaw,headYaw,drop,legs,arms,walking};
+  }
+  const project=(point,yaw)=>[point[0]*Math.cos(yaw)+point[2]*Math.sin(yaw),point[1]+.16*(point[2]*Math.cos(yaw)-point[0]*Math.sin(yaw))];
+  function paint(g,p,light,weather){
+    const h=p.h*p.height,x=p.x,y=p.y,r=pose(p),back=(1-Math.cos(r.yaw))/2;
+    const shade=.78+.22*light.day,cold=weather&&weather.temperature<8;
+    const color=(hex,gain=1)=>`rgb(${[1,3,5].map(i=>Math.round(clamp(parseInt(hex.slice(i,i+2),16)*shade*gain,0,255))).join(',')})`;
+    const P=point=>{const q=project(point,r.yaw);return[x+q[0]*h,y+q[1]*h]};
+    function line(hex,width,points,gain=1){g.strokeStyle=color(hex,gain);g.lineWidth=h*width;g.lineCap='round';g.lineJoin='round';g.beginPath();points.forEach((v,i)=>i?g.lineTo(...P(v)):g.moveTo(...P(v)));g.stroke()}
+    function poly(hex,points,gain=1){g.fillStyle=color(hex,gain);g.beginPath();points.forEach((v,i)=>i?g.lineTo(...P(v)):g.moveTo(...P(v)));g.closePath();g.fill()}
+    const torso=(lateral,vertical,forward=0)=>[lateral*(p.build||1)+r.shoulder[0],vertical+r.drop,forward];
+    const pants=['#354054','#536178','#383b42','#56514b'][mod(p.id,4)];
+    g.save();g.globalAlpha=.19;g.fillStyle='#101321';g.beginPath();g.ellipse(x,y+1,h*.15,h*.021,0,0,TAU);g.fill();g.globalAlpha=1;
+    const leg=l=>{line(pants,.074,[l.hip,l.knee],l.side<0?.82:1);line(pants,.055,[l.knee,l.ankle],l.side<0?.86:1);
+      const a=l.ankle,toe=[a[0],a[1]+.022+Math.sin(l.roll)*.10,a[2]+.10],heel=[a[0],a[1]+.020-Math.sin(l.roll)*.04,a[2]-.04];
+      line('#232833',.038,[heel,toe]);line('#a3a5a2',.009,[[heel[0],heel[1]+.012,heel[2]],[toe[0],toe[1]+.012,toe[2]]]);
+      line(pants,.012,[l.hip,l.knee,l.ankle],1.16);
+    };
+    r.legs.slice().sort((a,b)=>project(a.hip,r.yaw)[1]-project(b.hip,r.yaw)[1]).forEach(leg);
+    const arm=a=>{line(p.coat,cold?.064:.051,[a.shoulder,a.elbow],a.side<0?.84:1);line(p.coat,cold?.052:.041,[a.elbow,a.wrist],a.side<0?.88:1);
+      line(p.skin,.029,[a.wrist,[a.wrist[0],a.wrist[1]+.037,a.wrist[2]+.005]])};
+    const sortedArms=r.arms.slice().sort((a,b)=>project(a.shoulder,r.yaw)[1]-project(b.shoulder,r.yaw)[1]);arm(sortedArms[0]);
+    poly(pants,[torso(-.087,-.573),torso(.087,-.573),torso(.089,-.482),torso(0,-.474),torso(-.089,-.482)]);
+    // Front and back planes share the same ribcage/pelvis and rotate together.
+    const width=cold?.118:.109;
+    for(const z of [-.035,.035])poly(p.coat,[torso(-.051,-.848,z),torso(.051,-.848,z),torso(width,-.804,z),torso(.092,-.573,z),torso(-.092,-.573,z),torso(-width,-.804,z)],z<0?.86:1);
+    g.globalAlpha=1-back;poly('#d1c9b5',[torso(-.035,-.838,.039),torso(.035,-.838,.039),torso(.020,-.768,.039),torso(-.02,-.768,.039)]);
+    line(p.coat,.012,[torso(-.025,-.815,.043),torso(0,-.765,.043),torso(0,-.58,.043)],.68);g.globalAlpha=1;
+    arm(sortedArms[1]);
+    poly(p.skin,[torso(-.021,body.neckTop,.015),torso(.021,body.neckTop,.015),torso(.024,body.neckBottom,.015),torso(-.024,body.neckBottom,.015)]);
+    if(cold)line(p.coat,.028,[torso(-.045,-.844,.02),torso(.045,-.844,.02)],.73);
+    const head=P(r.head),hx=head[0],hy=head[1],rx=h*.052,ry=h*body.headRadius,face=Math.cos(r.headYaw),profile=Math.sin(r.headYaw);
+    g.save();g.beginPath();g.ellipse(hx,hy,rx,ry,0,0,TAU);g.clip();g.fillStyle=color(p.hair);g.fillRect(hx-rx,hy-ry,rx*2,ry*2);
+    // Skin visibility varies continuously; hair remains attached to the skull.
+    g.globalAlpha=smooth((face+.35)/.5);g.fillStyle=color(p.skin);g.beginPath();g.ellipse(hx+profile*rx*.60,hy+ry*.19,rx*(.52+.36*Math.max(0,face)),ry*.83,0,0,TAU);g.fill();
+    g.globalAlpha=1;g.fillStyle=color(p.hair);g.beginPath();g.ellipse(hx-profile*rx*.1,hy-ry*.65,rx*1.02,ry*(p.id%3===0?.47:.36),0,0,TAU);g.fill();g.restore();
+    // Ear and nose are subpixel cues in the distance, visible only nearby.
+    if(h>38){g.globalAlpha=smooth((face+.2)/.65);g.fillStyle=color(p.skin,.90);g.beginPath();g.ellipse(hx-profile*rx*.42,hy+ry*.10,h*.010,h*.016,0,0,TAU);g.fill();
+      g.fillStyle=color(p.skin,1.06);g.beginPath();g.ellipse(hx+profile*rx*.86,hy+ry*.15,h*.009,h*.014,0,0,TAU);g.fill();
+      g.globalAlpha=smooth((face+.15)/.7);g.fillStyle=color('#40352e');
+      for(const side of [-1,1]){g.beginPath();g.ellipse(hx+profile*rx*.44+side*rx*.34*Math.max(0,face),hy-ry*.06,h*.0038,h*.0048,0,0,TAU);g.fill()}
+      g.strokeStyle=color(p.skin,.72);g.lineWidth=h*.003;g.beginPath();g.moveTo(hx+profile*rx*.6-rx*.16,hy+ry*.52);g.lineTo(hx+profile*rx*.6+rx*.16,hy+ry*.52);g.stroke();g.globalAlpha=1;}
+    if(p.id%4===0){g.globalAlpha=smooth((back-.25)/.5);poly('#484a52',[torso(-.065,-.77,-.05),torso(.065,-.77,-.05),torso(.068,-.60,-.05),torso(-.068,-.60,-.05)]);g.globalAlpha=1;}
+    g.restore();
+  }
+  root.PedestrianRig={body,pose,paint,footCycle,solveKnee,project,angleDelta,turnTowards};
+  if(typeof module!=='undefined')module.exports=root.PedestrianRig;
+})(typeof window==='undefined'?globalThis:window);

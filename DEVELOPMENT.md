@@ -26,9 +26,19 @@ Build a standalone, offline review file:
 python3 scripts/build-local-preview.py
 ```
 
-Open `.openai/Times-Square-Local-Test.html` in a browser. No server or package installation is needed. The file includes all scene images, campaign frames, JavaScript and CSS. Its Test scenes panel offers midday, sunset, 1:47 AM, 4 AM and midnight presets, plus a phone viewport. Resize the browser to check desktop granularity. Use Hide controls or H inside the artwork to toggle the scene controls.
+Open `.openai/Times-Square-Local-Test.html` in a browser. No server or package installation is needed. The file includes all scene images, campaign frames, JavaScript and CSS. Its Test scenes panel offers snowfall, retained snow, consecutive thaw days, spring rain, a cloudy night, summer and sunset presets, plus a phone viewport. **Inspect walking mechanics** opens an enlarged gait study with front/side/back/turning views, a skeleton overlay, pause, and quarter speed. Resize the browser to check desktop granularity. Use Hide controls or H inside the artwork to toggle the scene controls.
 
-The preview is generated from current source, starts paused, and does not publish or create a pull request. Review the pavement, screen glow, crowd and menu behavior before proposing changes. Run `npm test` for automated coverage of adaptive detail, bounded diffuse illumination and control toggling alongside the existing scene regressions.
+The preview is generated from current source, starts paused, and does not publish or create a pull request. Review the gait, clouds, accumulated snow, pavement, screen glow, crowd and menu behavior before proposing changes. Run `npm test` for automated coverage of adaptive detail, bounded diffuse illumination and control toggling alongside gait, seasonal history and lunar phase checks. [Mechanics and reference measurements](docs/movement-weather.md) explain the implementation and approximations.
+
+## Temporary Cloudflare review site
+
+The review deployment is a separate Worker named `ascii-review`, served at `https://ascii-review.aryamandarda.workers.dev/review/`. It uses the `preview/seasonal-gait` branch. The production Worker is `ascii-art` and continues to follow `main`.
+
+Its build command is `python3 scripts/build-local-preview.py --hosted`. This generates `dist/review/index.html` with the same weather presets and walking study as the offline review. Assets load from their normal URLs, so the review page itself stays small. The generated page is excluded from Git and asks search engines not to index it.
+
+The review uses the existing Workers Builds deployment method, with an explicit target: `npx wrangler deploy --name ascii-review --assets dist --compatibility-date 2026-11-08`. Update only the review branch during review; do not merge into `main` or change the production build trigger until release is requested.
+
+Keep the temporary review site available until Aryaman explicitly says the review is finished and asks for deletion. At that point, remove its build trigger first and then delete only the `ascii-review` Worker. Keep the source branch and production site. A later review can recreate the same Worker name and URL.
 
 ## Separate artwork and personal website repositories
 

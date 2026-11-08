@@ -1,4 +1,5 @@
 (function(root){
+  const Rig=root.PedestrianRig||(typeof require!=='undefined'?require('./pedestrian-rig.js'):null);
   const weights=[.32,.15,.09,.055,.04,.06,.18,.43,.65,.44,.25,.47,.94,1,.71,.76,.99,1.08,1.03,.83,.73,.64,.51,.39];
   const daily=220000,total=weights.reduce((a,b)=>a+b,0),peak=Math.max(...weights);
   const coats=['#28adb9','#bd4a74','#ce8c4d','#5d81a8','#748360','#ad6060','#d1bb86','#495368','#8c79a4','#afb9b1'],skins=['#e8ba93','#a46d4b','#70452f','#d4976d','#c88457'];
@@ -20,7 +21,7 @@
   function project(p){return{x:640+800*p[0]/p[1],y:600+1440/p[1],h:1400/p[1]}}
   function groundPath(p){const lengths=p.slice(1).map((v,i)=>distance(v,p[i]));return{p,lengths,length:lengths.reduce((a,b)=>a+b,0)}}
   function path(points){return groundPath(points.map(unproject))}
-  function appearance(id){return{id,coat:coats[mod(id,coats.length)],skin:skins[mod(id,skins.length)],hair:['#29252b','#49352d','#ab946d','#8b8d94'][mod(id,4)],height:.93+random(id+11)*.14,stride:.78+random(id+26)*.29,gait:.75+random(id+31)*.40,armSwing:.7+random(id+32)*.55,bob:.0015+random(id+36)*.002,paceInterval:7+random(id+38)*12,phase:random(id+39)*Math.PI*2,radius:.225+random(id+41)*.035}};
+  function appearance(id){return{id,coat:coats[mod(id,coats.length)],skin:skins[mod(id,skins.length)],hair:['#29252b','#49352d','#ab946d','#8b8d94'][mod(id,4)],height:.93+random(id+11)*.14,build:.88+random(id+16)*.25,stride:1.25+random(id+26)*.16,gait:.75+random(id+31)*.40,armSwing:.7+random(id+32)*.55,bob:.0015+random(id+36)*.002,paceInterval:7+random(id+38)*12,phase:random(id+39)*Math.PI*2,radius:.225+random(id+41)*.035}};
   // A few occupied pockets of furniture, with clear walking space between them.
   // Chair angles are ground-plane bearings, so opposite chairs really face inward.
   const tables=[
@@ -37,7 +38,7 @@
     return{tableId:table.id,index,ground,facing,...project(ground)};
   }));
   const obstacles=tables.map(t=>({id:t.id,p:unproject([t.x,t.y]),radius:Math.max(...t.chairs.map(c=>c.radius))+.23}));
-  const trips=new Map(),SLOT=.9,MAX_TRIP=600;
+  const trips=new Map(),SLOT=.40,MAX_TRIP=600;
   function trip(slot){
     if(trips.has(slot))return trips.get(slot);
     const birth=slot*SLOT,ratio=trafficAt(CityCalendar.parts(birth*60000).hour).ratio;let result=null;
@@ -46,7 +47,7 @@
       let points=template.map((p,i)=>[p[0]+(i===0||i===template.length-1?0:(random(slot+i*17)-.5)*100),p[1]+(random(slot+i*23+17)-.5)*28]);
       // Each journey gets different destinations and bends, not just a lateral offset.
       if(random(slot+3)>.5)points.reverse();
-      const route=navigate(path(points)),speed=.43+random(slot+6)*.17;
+      const route=navigate(path(points)),speed=1.18+random(slot+6)*.23;
       result={...appearance(slot),birth,route,speed,duration:route.length/(speed*.8),kind:'walk'};
     }
     trips.set(slot,result);if(trips.size>8000)trips.delete(trips.keys().next().value);return result;
@@ -56,7 +57,7 @@
     if(random(id+33)>.10+.84*trafficAt(CityCalendar.parts(birth*60000).hour).ratio)return null;
     const edge=table.x<640?-240:1520,approach=project(chair.ground.map((v,i)=>v-chair.facing[i]*.65));
     const route=navigate(path([[edge,table.y+120],[approach.x,table.y+105],[approach.x,approach.y],[chair.x,chair.y]]),table.id);
-    return{...appearance(id),birth,route,speed:.43+random(id+12)*.10,duration:route.length/.34,kind:'visit',seat,tableId:table.id,sitFacing:chair.facing,dwell:120+random(id+20)*65};
+    return{...appearance(id),birth,route,speed:1.14+random(id+12)*.18,duration:route.length/.85,kind:'visit',seat,tableId:table.id,sitFacing:chair.facing,dwell:120+random(id+20)*65};
   }
   function inPlaza(p){const q=project(p);if(q.x<735||q.x>1500)return true;return q.y-q.h*.06>642+(q.x-735)*148/765+2}
   function segmentDistance(a,b,p){const dx=b[0]-a[0],dz=b[1]-a[1],d=dx*dx+dz*dz,t=d?clamp(((p[0]-a[0])*dx+(p[1]-a[1])*dz)/d,0,1):0;return Math.hypot(a[0]+dx*t-p[0],a[1]+dz*t-p[1])}
@@ -97,7 +98,7 @@
   }
   const STEP=.125,BLOCK=120,WARMUP=360,blocks=new Map(),checkpoints=new Map();
   const copyAgent=a=>({...a,pos:[...a.pos]});
-  const snapshot=a=>({definition:a.definition,pos:[...a.pos],vx:a.vx,vz:a.vz,travelled:a.travelled,sitting:a.sitting,waypoint:a.waypoint,route:a.route});
+  const snapshot=a=>({definition:a.definition,pos:[...a.pos],vx:a.vx,vz:a.vz,travelled:a.travelled,heading:a.heading,locomotion:a.locomotion,sitting:a.sitting,waypoint:a.waypoint,route:a.route});
   function buildBlock(key){
     const start=key*BLOCK,seed=checkpoints.get(key),begin=seed?start:start-WARMUP;
     const agents=seed?seed.agents.map(copyAgent):[],pending=seed?[...seed.pending]:[],frames=[];
@@ -111,7 +112,7 @@
       const comfort=1.08;
       while((slot+1)*SLOT<=t){slot++;queue(trip(slot))}
       visits.forEach((cycle,seat)=>{while((visits[seat]+1)*430-seat*41<=t){visits[seat]++;queue(visit(visits[seat],seat))}});
-      for(let i=pending.length-1;i>=0;i--){const spec=pending[i],p=spec.route.p[0];if(agents.some(a=>distance(a.pos,p)<a.radius+spec.radius+.08))continue;agents.push({...spec,definition:spec,pos:[...p],vx:0,vz:0,waypoint:1,travelled:0,sitting:0,departing:false,entered:false});pending.splice(i,1)}
+      for(let i=pending.length-1;i>=0;i--){const spec=pending[i],p=spec.route.p[0];if(agents.some(a=>distance(a.pos,p)<a.radius+spec.radius+.08))continue;agents.push({...spec,definition:spec,pos:[...p],vx:0,vz:0,waypoint:1,travelled:0,heading:Math.atan2(spec.route.p[1][0]-p[0],p[1]-spec.route.p[1][1]),locomotion:0,sitting:0,departing:false,entered:false});pending.splice(i,1)}
       // Rotate priority so one walker does not always win a crossing.
       agents.sort((a,b)=>a.id-b.id);
       const offset=agents.length?Math.floor(t/STEP)%agents.length:0;
@@ -144,7 +145,7 @@
           continue;
         }
         const fx=(target[0]-a.pos[0])/gap,fz=(target[1]-a.pos[1])/gap;
-        const pace=.80+.12*Math.sin(t/a.paceInterval*Math.PI*2+a.phase),weave=Math.sin(t/(a.paceInterval*.73)+a.phase)*.065;
+        const pace=.90+.06*Math.sin(t/a.paceInterval*Math.PI*2+a.phase),weave=Math.sin(t/(a.paceInterval*.73)+a.phase)*.065;
         let vx=(fx-fz*weave)*a.speed*pace,vz=(fz+fx*weave)*a.speed*pace;
         const neighbors=agents.filter(b=>b!==a&&!b.done&&distance(a.pos,b.pos)<2.2);
         for(const b of neighbors){
@@ -174,6 +175,11 @@
         }
         if(chosen){const dx=chosen[0]-a.pos[0],dz=chosen[1]-a.pos[1];a.travelled+=Math.hypot(dx,dz);a.pos=chosen;a.vx=dx/STEP;a.vz=dz/STEP}else{a.vx=a.vz=0}
       }
+      for(const a of agents){
+        const velocity=Math.hypot(a.vx,a.vz),facing=a.sitting>.5?a.sitFacing:null;
+        if(facing||velocity>.06){const target=facing?Math.atan2(facing[0],-facing[1]):Math.atan2(a.vx,-a.vz);a.heading=Rig.turnTowards(a.heading,target,STEP)}
+        a.locomotion+=(Math.min(1,velocity/.35)*(1-a.sitting)-a.locomotion)*(1-Math.exp(-STEP/.42));
+      }
       for(let i=agents.length-1;i>=0;i--)if(agents[i].done)agents.splice(i,1);
       if(t===start&&!seed)checkpoints.set(key,save());
       if(t>=start)frames.push(agents.map(snapshot));
@@ -190,48 +196,16 @@
     const b=blocks.get(key)||buildBlock(key),position=(time-b.start)/STEP,i=Math.floor(position),f=position-i;
     const frame=b.frames[i],next=new Map((b.frames[i+1]||frame).map(a=>[a.definition.id,a]));
     return frame.map(a=>{const n=next.get(a.definition.id)||a,p=a.pos.map((v,i)=>v+(n.pos[i]-v)*f),q=project(p),travelled=a.travelled+(n.travelled-a.travelled)*f;
-      return{...a.definition,...a,...q,ground:p,dx:Math.abs(a.vx)>.01?a.vx:(a.route.p[a.waypoint][0]-a.pos[0]),back:a.sitting>.5?a.definition.sitFacing[1]>.15:a.vz>.04,seated:a.sitting+(n.sitting-a.sitting)*f,step:a.definition.phase+travelled/a.definition.stride*Math.PI*2};
+      return{...a.definition,...a,...q,ground:p,heading:a.heading+Rig.angleDelta(a.heading,n.heading)*f,locomotion:a.locomotion+(n.locomotion-a.locomotion)*f,dx:Math.abs(a.vx)>.01?a.vx:(a.route.p[a.waypoint][0]-a.pos[0]),back:a.sitting>.5?a.definition.sitFacing[1]>.15:a.vz>.04,seated:a.sitting+(n.sitting-a.sitting)*f,step:a.definition.phase+travelled/a.definition.stride*Math.PI*2};
     }).filter(p=>p.x>-210&&p.x<1490);
   }
-  // Adult proportions in units of standing height. The pelvis joins the torso
-  // to two separate thighs; leg swing pivots below the waist, never in the chest.
-  const body={headTop:-1,headCenter:-.923,headRadius:.069,shoulder:-.795,waist:-.505,hip:-.435,knee:-.235,ankle:-.035,hipWidth:.071};
+  const body=Rig.body;
   function legPose(phase,side,dir,gait=1){
-    const a=phase+(side<0?Math.PI:0),swing=Math.sin(a),lift=Math.max(0,Math.cos(a));
-    const hip=[side*body.hipWidth,body.hip];
-    const ankle=[hip[0]+dir*swing*.032*gait,body.ankle-lift*.023*gait];
-    const knee=[hip[0]+(ankle[0]-hip[0])*.48+dir*lift*.009,body.knee+lift*.012];
-    return{hip,knee,ankle};
+    const r=Rig.pose({step:phase,stride:1.32,height:1,heading:0,locomotion:1});
+    const l=r.legs.find(l=>l.side===side),point=v=>Rig.project(v,0);
+    return{hip:point(l.hip),knee:point(l.knee),ankle:point(l.ankle)};
   }
-  function paintWalker(g,p,light){
-    const h=p.h*p.height,x=p.x,y=p.y,dir=p.dx>0?1:-1,sit=p.seated||0,phase=p.step,seatDirection=p.sitFacing?p.sitFacing[0]:dir;
-    const swing=Math.sin(phase)*(1-sit)*(p.armSwing||1),drop=.185*sit,bob=(1-sit)*Math.abs(Math.cos(phase))*(p.bob||.0025)*h;
-    const shade=.82+.18*light.day,color=c=>`rgb(${[1,3,5].map(i=>Math.round(parseInt(c.slice(i,i+2),16)*shade)).join(',')})`;
-    function line(c,width,points){g.strokeStyle=color(c);g.lineWidth=h*width;g.lineCap='round';g.lineJoin='round';g.beginPath();points.forEach(([a,b],i)=>i?g.lineTo(x+a*h,y+b*h-bob):g.moveTo(x+a*h,y+b*h-bob));g.stroke()}
-    function poly(c,points){g.fillStyle=color(c);g.beginPath();points.forEach(([a,b],i)=>i?g.lineTo(x+a*h,y+b*h-bob):g.moveTo(x+a*h,y+b*h-bob));g.closePath();g.fill()}
-    g.globalAlpha=.17;g.fillStyle='#111426';g.beginPath();g.ellipse(x,y+2,h*.14,h*.022,0,0,Math.PI*2);g.fill();g.globalAlpha=1;
-    const waist=body.waist+drop,hip=body.hip+drop,shoulder=body.shoulder+drop;
-    const pants=p.id%3===0?'#68768b':'#384457';
-    for(const side of [-1,1]){
-      const leg=legPose(phase,side,dir,p.gait||1),seatedKnee=[seatDirection*.19+side*.055,-.23],seatedAnkle=[seatDirection*.21+side*.057,-.035];
-      const blend=(a,b)=>a.map((v,i)=>v+(b[i]-v)*sit),knee=blend(leg.knee,seatedKnee),ankle=blend(leg.ankle,seatedAnkle);
-      line(pants,.081,[[leg.hip[0],hip],knee]);line(pants,.067,[knee,ankle]);
-      line('#283243',.047,[[ankle[0]-.015*dir,ankle[1]],[ankle[0]+.052*dir,ankle[1]]]);
-    }
-    // A full-width waistband and tapered pelvis close the gap above the thighs.
-    poly(pants,[[-.098,waist-.012],[.098,waist-.012],[.106,hip+.018],[.044,hip+.025],[0,hip+.009],[-.044,hip+.025],[-.106,hip+.018]]);
-    poly(p.coat,[[-.06,shoulder-.02],[.06,shoulder-.02],[.118,shoulder+.028],[.108,waist-.016],[.088,waist+.012],[-.088,waist+.012],[-.108,waist-.016],[-.118,shoulder+.028]]);
-    for(const side of [-1,1]){
-      const hand=[(side*.143-swing*side*.032)*(1-sit)+seatDirection*.22*sit,(-.455)*(1-sit)+(-.415)*sit];
-      line(p.coat,.052,[[side*.112,shoulder+.04],[side*.145*(1-sit)+seatDirection*.10*sit,shoulder+.18],hand]);
-      line(p.skin,.037,[hand,[hand[0],hand[1]+.034]]);
-    }
-    line(p.skin,.05,[[0,-.858+drop],[0,shoulder+.025]]);
-    g.fillStyle=color(p.back?p.hair:p.skin);g.beginPath();g.ellipse(x+dir*h*.008,y+(body.headCenter+drop)*h-bob,h*.057,h*body.headRadius,0,0,Math.PI*2);g.fill();
-    poly(p.hair,[[-.054,-.933+drop],[-.047,-.983+drop],[.033,-.99+drop],[.058,-.949+drop],[.014,-.957+drop],[-.004,-.928+drop]]);
-    if(p.back&&p.id%3===0)poly('#625c68',[[-.067,shoulder+.08],[.067,shoulder+.08],[.071,waist-.045],[-.067,waist-.045]]);
-    g.globalAlpha=.12+.18*light.night;line('#bfe7ec',.008,[[-.103,shoulder+.05],[-.094,waist-.04]]);g.globalAlpha=1;
-  }
+  function paintWalker(g,p,light,weather){Rig.paint(g,p,light,weather)}
   // Furniture is projected in 3D rather than mirrored copies of a side view.
   function raised(p,height){const q=project(p);return[q.x,q.y-height*800/p[1]]}
   function paintChair(g,c){
@@ -259,8 +233,8 @@
     if(t.id!==2){const cup=P(t.id%2?.16:-.13,.08,height);g.fillStyle='#e8dfd0';g.fillRect(cup[0],cup[1]-800/center[1]*.10,800/center[1]*.055,800/center[1]*.10)}
     g.restore();
   }
-  function furnitureLayers(){return[
-    ...tables.map(t=>({y:t.y,paint:g=>paintTable(g,t)})),
+  function furnitureLayers(weather,light){return[
+    ...tables.map(t=>({y:t.y,paint:g=>{paintTable(g,t);if(weather&&root.CityWeather)root.CityWeather.paintFurnitureSnow(g,t,weather,light)}})),
     ...seats.map(c=>({y:c.y+(c.facing[1]>.1?1:-1),paint:g=>paintChair(g,c)}))
   ]}
   root.CityLife={weights,daily,trafficAt,peopleAt,paintWalker,paintTable,paintChairs,paintChair,furnitureLayers,tables,seats,tableScale,project,unproject,trip,SLOT,MAX_TRIP,legPose,body,densityMultiplier,renderDensity,obstacles,STEP,BLOCK};if(typeof module!=='undefined')module.exports=root.CityLife;
