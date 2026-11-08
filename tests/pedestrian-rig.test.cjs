@@ -45,3 +45,11 @@ for(let phase=0;phase<Math.PI*2;phase+=.03){
  assert(advance[0]*advance[1]<=1e-12,'Arms must alternate, not swing together');
  for(let i=0;i<2;i++)assert(advance[i]*(r.legs[1-i].ankle[2]-r.legs[i].ankle[2])>=-1e-12,'Each arm follows the opposite leg');
 }
+
+// Axial pelvis rotation preserves hip width and opposes the shoulder turn.
+for(let phase=0;phase<Math.PI*2;phase+=.04){
+ const r=R.pose({step:phase,stride:1.36,height:1,build:1});
+ assert(Math.abs(distance(r.legs[0].hip,r.legs[1].hip)-2*R.body.hipWidth)<1e-10,'Pelvis rotates as a rigid joint pair');
+ assert(Math.abs(r.pelvisYaw)<=.100001,'Twist stays subtle');
+ assert(r.pelvisYaw*r.shoulderYaw<=0,'Torso counterrotation remains coordinated');
+}

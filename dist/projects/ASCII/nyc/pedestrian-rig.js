@@ -37,12 +37,14 @@
     // fixed. Double support limits extension instead of stretching the shins.
     // Keep the pelvis close to a level trajectory rather than raising it to
     // the maximum extension of whichever leg happens to bear weight.
-    const pelvisYaw=.065*Math.cos(phase)*walking;
+    // Small axial hip rotation: each side advances with its leg while
+    // the shoulders counterrotate. Translation remains independently limited.
+    const pelvisYaw=.10*Math.cos(phase)*walking;
     const shoulderYaw=-.055*Math.cos(phase)*walking;
     const shoulderRoll=.025*Math.sin(phase)*walking;
     const lean=(.018+.006*Math.sin(phase*2))*walking;
-    const hipForwardShift=-.028*Math.sin(phase*2)*walking;
-    const forwardReach=.25*stride/height+.004;
+    const hipForwardShift=-.008*Math.sin(phase*2)*walking;
+    const forwardReach=.25*stride/height+.004+.14*Math.max(0,stride/height-.78);
     let hipHeight=Math.min(.510,.051+Math.sqrt(Math.max(.01,.487**2-forwardReach**2))+.012);
     hipHeight=Math.min(hipHeight,...feet.map(f=>{
       const hipForward=hipForwardShift+f.side*body.hipWidth*(p.build||1)*Math.sin(pelvisYaw);
@@ -58,7 +60,7 @@
     const build=p.build||1;
     const hip=[sway,body.hip+drop,hipForwardShift],shoulder=[sway*.45,body.shoulder+upperDrop, lean];
     const legs=feet.map(f=>{
-      const joint=[hip[0]+f.side*body.hipWidth*build,hip[1],hipForwardShift+f.side*body.hipWidth*build*Math.sin(pelvisYaw)];
+      const joint=[hip[0]+f.side*body.hipWidth*build*Math.cos(pelvisYaw),hip[1],hipForwardShift+f.side*body.hipWidth*build*Math.sin(pelvisYaw)];
       // A trailing swing leg must not pull the supporting hip down into a
       // crouch. Lift its ankle only enough to stay within fixed-leg reach.
       const reachLift=hipHeight-.039-Math.sqrt(Math.max(.01,(body.thigh+body.shank-.004)**2-(f.forward-joint[2])**2));
