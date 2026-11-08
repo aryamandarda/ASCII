@@ -97,7 +97,7 @@ function showControls(show){
   el('controlsToggle').setAttribute('aria-label',show?'Hide controls':'Show controls');
   el('controlsToggle').title=show?'Hide controls (H)':'Show controls (H)';
   el('controlsToggle').textContent=show?'Hide controls':'Show controls';
-  if(!show){el('skyOptions').hidden=true;el('sky').setAttribute('aria-expanded','false');el('controlsToggle').focus({preventScroll:true})}
+  if(!show){closeWeather();el('skyOptions').hidden=true;el('sky').setAttribute('aria-expanded','false');el('controlsToggle').focus({preventScroll:true})}
 }
 el('controlsToggle').onclick=()=>showControls(controlsHidden);
 
@@ -106,7 +106,9 @@ el('play').onclick=()=>{playing=!playing;last=0;controls();draw()};
 el('reverse').onclick=()=>{direction*=-1;controls();draw()};
 document.querySelectorAll('[data-speed]').forEach(b=>b.onclick=()=>{speed=+b.dataset.speed;controls();draw()});
 el('time').oninput=()=>{epoch=CityCalendar.localEpoch(CityCalendar.parts(epoch).date,+el('time').value);draw()};
-el('weather').onchange=()=>{weatherMode=el('weather').value;draw()};
+function closeWeather(){el('weatherOptions').hidden=true;el('weather').setAttribute('aria-expanded','false')}
+el('weather').onclick=()=>{const open=el('weatherOptions').hidden;el('skyOptions').hidden=true;el('sky').setAttribute('aria-expanded','false');el('weatherOptions').hidden=!open;el('weather').setAttribute('aria-expanded',String(open))};
+document.querySelectorAll('[data-weather]').forEach(b=>b.onclick=()=>{weatherMode=b.dataset.weather;document.querySelectorAll('[data-weather]').forEach(option=>option.setAttribute('aria-pressed',String(option.dataset.weather===weatherMode)));el('weather').title='Weather: '+b.textContent;closeWeather();el('weather').focus({preventScroll:true});draw()});
 el('date').onchange=()=>{if(!/^\d{4}-\d{2}-\d{2}$/.test(el('date').value))return;epoch=CityCalendar.localEpoch(el('date').value,Math.floor(CityCalendar.parts(epoch).hour*60));draw()};
 function enter(){immersed=true;el('controlsToggle').hidden=false;showControls(true);el('immerse').setAttribute('tabindex','-1');el('immerse').setAttribute('aria-hidden','true');requestAnimationFrame(()=>document.body.classList.add('immersed'));el('leave').focus({preventScroll:true});const request=document.documentElement.requestFullscreen;if(request&&!document.fullscreenElement){const p=request.call(document.documentElement);if(p&&p.catch)p.catch(()=>{})}}
 function leave(){immersed=false;el('controlsToggle').hidden=true;document.body.classList.remove('immersed');el('controls').hidden=true;el('leave').hidden=true;el('immerse').removeAttribute('tabindex');el('immerse').removeAttribute('aria-hidden');el('immerse').focus({preventScroll:true});if(document.fullscreenElement&&document.exitFullscreen)document.exitFullscreen().catch(()=>{})}
@@ -116,7 +118,7 @@ document.addEventListener('visibilitychange',()=>{last=0;if(!document.hidden)dra
 function loop(now){if(!last)last=now;const dt=Math.min(1,(now-last)/1000);last=now;if(playing&&!document.hidden){epoch=CityCalendar.advance(epoch,dt,speed,direction);if(now-lastPaint>=1000/24){draw();lastPaint=now}}requestAnimationFrame(loop)}
 Promise.all([loadImage('times-square-empty-day.jpg'),loadImage('times-square-road-clean.png')]).then(([day,road])=>{environment=CityEnvironment.create(day,road);ready=true;resizeGrid();el('loading').hidden=true;el('immerse').disabled=false;requestAnimationFrame(loop)}).catch(()=>{el('loading').textContent='Please refresh';el('loading').style.width='auto'});
 function chooseSky(id){CityEnvironment.setPalette(id);document.querySelectorAll('[data-sky]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.sky===id));canvas.dataset.skyPalette=id;try{localStorage.setItem('times-square-sky',id)}catch{}draw()}
-el('sky').onclick=()=>{const open=el('skyOptions').hidden;el('skyOptions').hidden=!open;el('sky').setAttribute('aria-expanded',open)};
+el('sky').onclick=()=>{closeWeather();const open=el('skyOptions').hidden;el('skyOptions').hidden=!open;el('sky').setAttribute('aria-expanded',open)};
 document.querySelectorAll('[data-sky]').forEach(b=>b.onclick=()=>{chooseSky(b.dataset.sky);el('skyOptions').hidden=true;el('sky').setAttribute('aria-expanded',false)});
 try{const saved=localStorage.getItem('times-square-sky');if(CityEnvironment.palettes[saved])chooseSky(saved)}catch{}
 controls();updateTime();

@@ -7,4 +7,4 @@
 .controls-toggle:hover,.controls-toggle:focus-visible{opacity:1}
 @media(max-width:600px){.controls-toggle{top:max(20px,env(safe-area-inset-top));left:18px}}
 
-.weather-control{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 10px;font-size:11px;color:#e7ecf1b8}.weather-control select{font:inherit;color:#f6f5f1;background:#17202dcc;border:1px solid #ffffff24;border-radius:12px;padding:8px 10px;max-width:75%;cursor:pointer}.weather-control select:focus-visible{outline:2px solid #f5f2d9;outline-offset:3px}
+.weather-options{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}.weather-options button svg{width:26px;height:26px;margin:0 0 1px}.weather-options button{min-height:65px}
