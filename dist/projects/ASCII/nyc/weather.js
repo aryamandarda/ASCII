@@ -50,6 +50,17 @@
     while(states.length<=index+1){const i=states.length-1;states.push(integrate(states[i],conditionsAt(start+(i+.5)*HOUR),1))}
     const a=states[index],b=states[index+1];return{...conditionsAt(epoch),roofSnow:mix(a.roof,b.roof,fraction),groundSnow:mix(a.ground,b.ground,fraction),wetness:mix(a.wet,b.wet,fraction)};
   }
+  // Overrides are snapshots, never writes to the calendar's accumulation history.
+  function simulate(epoch,mode='natural'){
+    const natural=weatherAt(epoch);
+    if(!['clear','passing','overcast','rain','snow'].includes(mode))return natural;
+    const cloud={clear:.05,passing:.45,overcast:.95,rain:.98,snow:.96}[mode];
+    const w={...natural,cloud,overcast:smooth(.64,.90,cloud),rain:0,snow:0,precipitation:0,
+      kind:mode==='passing'?'cloudy':mode};
+    if(mode==='rain')Object.assign(w,{rain:.65,precipitation:.65,temperature:Math.max(4,w.temperature),wetness:.85,groundSnow:0,roofSnow:0});
+    if(mode==='snow')Object.assign(w,{snow:.55,precipitation:.55,temperature:Math.min(-2,w.temperature),groundSnow:Math.max(3,w.groundSnow),roofSnow:Math.max(4,w.roofSnow),wetness:.15});
+    return w;
+  }
   function cloudField(x,y,epoch,cover){
     const drift=epoch/HOUR*.16,perspective=1-.60*clamp(y/680,0,1),X=(x-W*.5)/(240*perspective)+drift,Y=y/165;
     // Three smooth scales are enough: soft passing patches or a quiet solid
@@ -118,15 +129,15 @@
     // create depth; fixed particle identities prevent frame-to-frame flicker.
     const t=epoch/60000,windOffset=35*Math.sin(epoch/(4*HOUR))+65*Math.sin(epoch/(11*HOUR)+1.3);
     g.save();g.lineCap='round';
-    for(let i=0;i<180;i++){const depth=.3+hash(i+817)*.7,baseX=hash(i+123)*1600,baseY=hash(i+456)*1100;
+    for(let i=0;i<280;i++){const depth=.3+hash(i+817)*.7,baseX=hash(i+123)*1600,baseY=hash(i+456)*1100;
       if(snow>.002){const y=mod(baseY+t*(18+depth*36),1000)-70,x=mod(baseX+t*2+windOffset+Math.sin(t*.48+i)*12,1500)-100;
-        g.globalAlpha=snow*(.35+.5*depth);g.fillStyle=l.day>.5?'#f5f7f8':'#d8dfeb';g.beginPath();g.ellipse(x,y,.7+depth*1.5,.7+depth*1.5,0,0,Math.PI*2);g.fill()}
+        g.globalAlpha=snow*(.55+.45*depth);g.fillStyle=l.day>.5?'#f5f7f8':'#d8dfeb';g.beginPath();g.ellipse(x,y,.9+depth*2.1,.9+depth*2.1,0,0,Math.PI*2);g.fill()}
       if(rain>.002){const y=mod(baseY+t*(330+depth*240),1000)-60,x=mod(baseX+t*8+windOffset*2,1500)-100;
-        g.globalAlpha=rain*(.15+.21*depth);g.strokeStyle=l.day>.5?'#b9c9d5':'#94aaba';g.lineWidth=.6+depth*.65;g.beginPath();g.moveTo(x,y);g.lineTo(x+w.wind*3,y+7+depth*12);g.stroke();
+        g.globalAlpha=rain*(.32+.36*depth);g.strokeStyle=l.day>.5?'#d2dfe8':'#c0d2e3';g.lineWidth=.9+depth*.9;g.beginPath();g.moveTo(x,y);g.lineTo(x+w.wind*3,y+10+depth*17);g.stroke();
         if(i<45){const X=hash(i+711)*W,Y=696+hash(i+661)*155,age=mod(t*2+hash(i+712),1);if(Y>pavementTop(X)){g.globalAlpha=rain*(1-age)*.22;g.beginPath();g.ellipse(X,Y,.8+age*3,.3+age,0,0,Math.PI*2);g.stroke()}}
       }
     }g.restore();
   }
-  root.CityWeather={normals,climate,front,conditionsAt,weatherAt,integrate,cloudField,cloudDensity,celestialVisibility,paintClouds,paintSurfaces,paintPrecipitation,paintFurnitureSnow,snowCoverage,ledges,noise};
+  root.CityWeather={normals,climate,front,conditionsAt,weatherAt,simulate,integrate,cloudField,cloudDensity,celestialVisibility,paintClouds,paintSurfaces,paintPrecipitation,paintFurnitureSnow,snowCoverage,ledges,noise};
   if(typeof module!=='undefined')module.exports=root.CityWeather;
 })(typeof window==='undefined'?globalThis:window);

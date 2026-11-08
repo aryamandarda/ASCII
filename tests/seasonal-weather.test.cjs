@@ -22,3 +22,18 @@ const fresh=C.lightAt(Date.parse('2024-04-08T18:21Z')),full=C.lightAt(Date.parse
 assert.deepEqual(E.moonSpan(0,.25,.5),[0,1]);assert.deepEqual(E.moonSpan(0,.75,.5),[-1,-0]);assert.deepEqual(E.moonSpan(0,.5,1),[-1,1]);
 for(let h=0;h<24;h++){const l=C.lightAt(epoch+h*H);assert.equal(l.moon,l.moonAltitude>0&&l.moonFraction>.004)}
 console.log('PASS: seasonal storms, persistent snow, multi-day thaw, sheltered accumulation, wet paving, continuous cloud cover, deterministic date travel and lunar phase geometry.');
+
+for(const date of ['2026-01-02','2026-07-15']){
+  const t=C.localEpoch(date,720),baseline=W.weatherAt(t);
+  for(const mode of ['clear','passing','overcast','rain','snow']){
+    const w=W.simulate(t,mode);assert(Number.isFinite(w.temperature));
+    assert.equal(w.precipitation,w.rain+w.snow);
+    if(mode==='clear')assert.equal(W.cloudDensity(640,200,t,w.cloud),0);
+    if(mode==='passing')assert.equal(w.cloud,.45);
+    if(['overcast','rain','snow'].includes(mode))assert(W.cloudDensity(640,200,t,w.cloud)>.99);
+    if(mode==='rain')assert(w.rain>.5&&w.snow===0&&w.wetness>.8&&w.temperature>0);
+    if(mode==='snow')assert(w.snow>.5&&w.rain===0&&w.groundSnow>=3&&w.temperature<0);
+    assert.deepEqual(W.simulate(t,'natural'),baseline,'Natural restores untouched datetime weather');
+  }
+  assert.deepEqual(W.simulate(t,'unknown'),baseline);
+}

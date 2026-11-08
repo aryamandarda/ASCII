@@ -29,6 +29,8 @@ Open [localhost:8000/projects/ASCII/nyc/](http://localhost:8000/projects/ASCII/n
 
 Select **Immerse** to enter the artwork. Use the date and time controls to explore the scene, the sunset icon to choose a palette, and the playback controls to pause or reverse time. Use **Hide controls** or **H** for a clear view.
 
+**Weather** offers Natural, Clear, Passing Clouds, Overcast, Rain, and Snow. Manual selections stay active as you change the date or play time forward/backward. Choose **Natural · Date synced** to immediately restore seasonal weather and snow history for the selected date and time. Overrides reset to Natural on reload; they do not change the calendar simulation.
+
 Speeds range from **0.5× to 5×**. At 1×, five simulated minutes pass in five seconds. People, traffic, billboards, and lighting follow the same clock. Reduced-motion preferences are respected.
 
 ## Development

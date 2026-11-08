@@ -160,7 +160,7 @@
     while(head<tail){const k=queue[head++],x=k%W;for(const n of [x>0?k-1:-1,x<W-1?k+1:-1,k>=W?k-W:-1,k+W<W*H?k+W:-1])if(n>=0&&!seen[n]&&blue(n)){seen[n]=1;queue[tail++]=n}}
     const maskPixels=m.createImageData(W,H);for(let i=0;i<seen.length;i++){maskPixels.data[i*4]=maskPixels.data[i*4+1]=maskPixels.data[i*4+2]=255;maskPixels.data[i*4+3]=seen[i]?255:0}m.putImageData(maskPixels,0,0);
     const lit=g.createImageData(W,H),windows=extractWindows(source),base=makeCanvas(),baseContext=base.getContext('2d');let cached=-1,frameKey=null;
-    function render(epoch,weather){const frame=Math.floor(epoch/15000)+paletteId;if(frameKey===frame)return canvas;frameKey=frame;const key=Math.floor(epoch/60000)+paletteId,l={...CityCalendar.lightAt(epoch),cloud:weather?weather.cloud:0},lut=[[],[],[]];
+    function render(epoch,weather){const frame=Math.floor(epoch/15000)+paletteId+(weather?weather.cloud.toFixed(2)+':'+weather.precipitation.toFixed(2):'');if(frameKey===frame)return canvas;frameKey=frame;const key=Math.floor(epoch/60000)+paletteId+(weather?weather.cloud.toFixed(2):0),l={...CityCalendar.lightAt(epoch),cloud:weather?weather.cloud:0},lut=[[],[],[]];
       if(key!==cached){cached=key;
       for(let v=0;v<256;v++){const rgb=surfaceColor([v,v,v],l);for(let c=0;c<3;c++)lut[c][v]=rgb[c]}
       for(let i=0;i<a.length;i+=4){lit.data[i]=lut[0][a[i]];lit.data[i+1]=lut[1][a[i+1]];lit.data[i+2]=lut[2][a[i+2]];lit.data[i+3]=255}baseContext.putImageData(lit,0,0);}
