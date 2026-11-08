@@ -22,6 +22,9 @@
       <button id="sky" class="icon sky-toggle" aria-label="Choose sunrise and sunset colors" aria-expanded="false" title="Twilight palette"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17h18M6 14a6 6 0 0 1 12 0M12 3v2M4 7l2 2m14-2-2 2M5 21h14"/></svg></button><output id="timeValue" for="time"></output>
     </div>
     <input id="time" type="range" min="0" max="1439" step="1" aria-label="Time of day in New York">
+    <label class="weather-control" for="weather"><span>Weather</span><select id="weather" title="Natural follows the selected date and time; other weather stays selected until you choose Natural.">
+      <option value="natural">Natural · Date synced</option><option value="clear">Clear</option><option value="passing">Passing Clouds</option><option value="overcast">Overcast</option><option value="rain">Rain</option><option value="snow">Snow</option>
+    </select></label>
     <div class="transport">
       <div class="speeds" role="group" aria-label="Animation speed"><button data-speed="0.5" aria-pressed="false" aria-label="Half speed">0.5×</button><button data-speed="1" aria-pressed="true" aria-label="Normal speed">1×</button><button data-speed="2" aria-pressed="false" aria-label="Double speed">2×</button><button data-speed="3" aria-pressed="false" aria-label="Triple speed">3×</button><button data-speed="5" aria-pressed="false" aria-label="Five times speed">5×</button></div>
       <div class="playback">
