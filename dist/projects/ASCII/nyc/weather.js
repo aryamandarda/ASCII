@@ -144,12 +144,13 @@
   function paintPrecipitation(g,w,l,epoch){
     const rain=Math.sqrt(clamp(w.rain/1.2,0,1)),snow=Math.sqrt(clamp(w.snow/.8,0,1));if(rain+snow<.002)return;
     const t=epoch/60000;g.save();g.lineCap='round';
-    for(let i=0;i<360;i++)for(const kind of ['rain','snow']){
+    for(let i=0;i<820;i++)for(const kind of ['rain','snow']){
+      if(kind==='rain'&&i>=360)continue;
       const strength=kind==='rain'?rain:snow;if(strength<.002)continue;
       const p=precipitationParticle(i,t,kind,w.wind),q=p.point;
       if(q.x< -30||q.x>W+30||q.y< -30||q.y>H+30)continue;
-      g.globalAlpha=strength*p.alpha*(.45+.35*(1-p.z/80));
-      if(kind==='snow'){const r=clamp(q.scale*.025,.65,2.8);g.fillStyle=l.day>.5?'#f5f7f8':'#d8dfeb';g.beginPath();g.ellipse(q.x,q.y,r,r,0,0,Math.PI*2);g.fill()}
+      g.globalAlpha=strength*p.alpha*(kind==='snow'?.78+.22*(1-p.z/80):.45+.35*(1-p.z/80));
+      if(kind==='snow'){const r=clamp(q.scale*.050,1.15,3.8);g.fillStyle=l.day>.5?'#ffffff':'#edf4ff';g.beginPath();g.ellipse(q.x,q.y,r,r,0,0,Math.PI*2);g.fill()}
       else{g.strokeStyle=l.day>.5?'#d2dfe8':'#c0d2e3';g.lineWidth=clamp(q.scale*.012,.65,1.6);g.beginPath();g.moveTo(p.tail.x,p.tail.y);g.lineTo(q.x,q.y);g.stroke()}
     }
     if(rain>.002)for(let i=0;i<45;i++){const X=hash(i+711)*W,Y=696+hash(i+661)*155,age=mod(t*2+hash(i+712),1);if(Y>pavementTop(X)){g.globalAlpha=rain*(1-age)*.25;g.strokeStyle='#c0d2e3';g.lineWidth=.7;g.beginPath();g.ellipse(X,Y,.8+age*3,.3+age,0,0,Math.PI*2);g.stroke()}}

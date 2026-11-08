@@ -59,6 +59,25 @@
     const z=1440/Math.max(12,y-600),energy=irradianceAt([(x-640)*z/800,0,z],lamps),peak=Math.max(...energy),luminance=energy[0]*.2126+energy[1]*.7152+energy[2]*.0722;
     return peak>0?[...energy.map(v=>linearToSrgb(v/peak)),.52*night*fade*(1-Math.exp(-luminance*1.4))]:[0,0,0,0];
   }
+  // Rough wet stone reflects a broad lobe around the light/view half-vector.
+  // Surface variation is fixed in world space, so it never flickers with time.
+  function wetReflectionAt(x,y,wetness,lamps){
+    const edge=x<550?704-x*.10:x<745?649:649+(x-745)*.21;
+    if(wetness<=0||y<=edge)return [0,0,0,0];
+    const z=1440/Math.max(12,y-600),px=(x-640)*z/800;
+    const vl=Math.hypot(px,1.8,z),view=[-px/vl,1.8/vl,-z/vl],rgb=[0,0,0];
+    const texture=.56+.24*Math.sin(px*3.1+Math.sin(z*2.7))+.20*Math.sin(z*18+px*.8);
+    for(const lamp of lamps){const source=lamp.position?lamp:{...lamp,...emitterGeometry(lamp)},d=[source.position[0]-px,source.position[1],source.position[2]-z],len=Math.hypot(...d);
+      if(len<.001)continue;
+      const h=d.map((v,i)=>v/len+view[i]),hl=Math.hypot(...h),nh=hl>0?Math.max(0,h[1]/hl):0;
+      const emission=Math.max(0,-d.reduce((sum,v,i)=>sum+v*source.normal[i],0)/len);
+      const roughness=16+20/(1+source.area/20),spec=Math.pow(nh,roughness)*emission*source.area/(len*len+source.area)*3.5;
+      const radiance=lamp.radiance||lamp.color.map(v=>srgbToLinear(v)*lamp.power);
+      for(let i=0;i<3;i++)rgb[i]+=radiance[i]*spec;
+    }
+    const peak=Math.max(...rgb),fade=clamp((y-edge)/14,0,1);
+    return peak>0?[...rgb.map(v=>linearToSrgb(v/peak)),Math.min(.42,(1-Math.exp(-peak))*wetness*texture*fade)]:[0,0,0,0];
+  }
   let groundCanvas,groundContext,groundPixels;
   let haloCanvas,haloContext;
   function paintBillboardGlow(g,l,screens,ground=false,skyMask,wetness=0){
@@ -71,9 +90,13 @@
       const data=groundPixels.data;
       for(let y=0;y<86;y++)for(let x=0;x<128;x++){
         const c=groundLightAt((x+.5)*W/128,(y+.5)*H/86,l.night,lamps),i=(y*128+x)*4;
-        data[i]=c[0];data[i+1]=c[1];data[i+2]=c[2];data[i+3]=Math.round(Math.min(.78,c[3]*(1+wetness*.85))*255);
+        data[i]=c[0];data[i+1]=c[1];data[i+2]=c[2];data[i+3]=Math.round(c[3]*255);
       }
       groundContext.putImageData(groundPixels,0,0);g.imageSmoothingEnabled=true;g.drawImage(groundCanvas,0,0,W,H);
+      if(wetness>.01){
+        for(let y=0;y<86;y++)for(let x=0;x<128;x++){const c=wetReflectionAt((x+.5)*W/128,(y+.5)*H/86,wetness,lamps),i=(y*128+x)*4;data[i]=c[0];data[i+1]=c[1];data[i+2]=c[2];data[i+3]=Math.round(c[3]*255)}
+        groundContext.putImageData(groundPixels,0,0);g.drawImage(groundCanvas,0,0,W,H);
+      }
     }else for(const lamp of lamps){
       const x=lamp.x,y=lamp.y,rx=40+lamp.w*.75,ry=35+lamp.h*.75,strength=l.night*lamp.power*.32,c=lamp.color.join(',');
       g.save();g.translate(x,y);g.scale(rx,ry);const halo=g.createRadialGradient(0,0,0,0,0,1);
@@ -152,10 +175,23 @@
     g.save();g.globalAlpha=(.23+.77*l.night)*visibility;g.fillStyle='#e9e9d6';g.beginPath();outline.forEach((p,i)=>i?g.lineTo(...p):g.moveTo(...p));g.closePath();g.fill();g.restore();
   }
   function makeCanvas(){const c=document.createElement('canvas');c.width=W;c.height=H;return c}
+  function neutralizePavement(image){
+    const a=image.data,stride=W+1,sum=new Float64Array((W+1)*(H+1));
+    for(let y=0;y<H;y++){let row=0;for(let x=0;x<W;x++){const i=(y*W+x)*4;row+=a[i]*.2126+a[i+1]*.7152+a[i+2]*.0722;sum[(y+1)*stride+x+1]=sum[y*stride+x+1]+row}}
+    for(let y=649;y<H;y++)for(let x=0;x<W;x++){
+      const edge=x<550?704-x*.10:x<745?649:649+(x-745)*.21,blend=clamp((y-edge-3)/18,0,1);if(!blend)continue;
+      const r=12,x0=Math.max(0,x-r),x1=Math.min(W,x+r+1),y0=Math.max(0,y-r),y1=Math.min(H,y+r+1);
+      const mean=(sum[y1*stride+x1]-sum[y0*stride+x1]-sum[y1*stride+x0]+sum[y0*stride+x0])/((x1-x0)*(y1-y0));
+      const target=160+(y-649)*.025,gain=clamp(target/Math.max(1,mean),.65,1.4),i=(y*W+x)*4;
+      // Remove low-frequency photographic illumination, retain slab joints and grain.
+      for(let c=0;c<3;c++)a[i+c]=Math.round(clamp(a[i+c]*(1-blend+blend*gain),0,255));
+    }
+    return image;
+  }
   function create(day,roadPlate){
     const canvas=makeCanvas(),g=canvas.getContext('2d'),sky=makeCanvas(),s=sky.getContext('2d'),mask=makeCanvas(),m=mask.getContext('2d',{willReadFrequently:true});
     // One immutable geometric plate. Lighting changes pixels, never object positions.
-    m.drawImage(day,0,0,W,H);if(roadPlate){m.save();m.beginPath();[[746,619],[1110,620],[1280,650],[1280,763],[745,652]].forEach((p,i)=>i?m.lineTo(...p):m.moveTo(...p));m.closePath();m.clip();m.drawImage(roadPlate,0,0,W,H);m.restore()}const source=m.getImageData(0,0,W,H),a=source.data,seen=new Uint8Array(W*H),queue=new Int32Array(W*H);let head=0,tail=1;queue[0]=640;seen[640]=1;
+    m.drawImage(day,0,0,W,H);if(roadPlate){m.save();m.beginPath();[[746,619],[1110,620],[1280,650],[1280,763],[745,652]].forEach((p,i)=>i?m.lineTo(...p):m.moveTo(...p));m.closePath();m.clip();m.drawImage(roadPlate,0,0,W,H);m.restore()}const source=neutralizePavement(m.getImageData(0,0,W,H)),a=source.data,seen=new Uint8Array(W*H),queue=new Int32Array(W*H);let head=0,tail=1;queue[0]=640;seen[640]=1;
     const blue=k=>{let i=k*4;return k<W*620&&a[i]>80&&a[i]<215&&a[i+1]>135&&a[i+2]>220&&a[i+1]>a[i]+18&&a[i+2]>a[i+1]+12};
     while(head<tail){const k=queue[head++],x=k%W;for(const n of [x>0?k-1:-1,x<W-1?k+1:-1,k>=W?k-W:-1,k+W<W*H?k+W:-1])if(n>=0&&!seen[n]&&blue(n)){seen[n]=1;queue[tail++]=n}}
     const maskPixels=m.createImageData(W,H);for(let i=0;i<seen.length;i++){maskPixels.data[i*4]=maskPixels.data[i*4+1]=maskPixels.data[i*4+2]=255;maskPixels.data[i*4+3]=seen[i]?255:0}m.putImageData(maskPixels,0,0);
@@ -175,5 +211,5 @@
     }
     return{canvas,render,skyMask:mask,skyPixels:tail,windowCount:windows.length,distantWindowCount:windows.filter(w=>w.strength).length};
   }
-  root.CityEnvironment={create,skyColor,sunColor,surfaceColor,billboardExposure,billboardLight,paintBillboardGlow,windowState,windowColor,groundLightAt,irradianceAt,receiverLight,materialColor,emitterGeometry,distantFacades,moonSpan,paintMoon,palettes,setPalette};if(typeof module!=='undefined')module.exports=root.CityEnvironment;
+  root.CityEnvironment={neutralizePavement,wetReflectionAt,create,skyColor,sunColor,surfaceColor,billboardExposure,billboardLight,paintBillboardGlow,windowState,windowColor,groundLightAt,irradianceAt,receiverLight,materialColor,emitterGeometry,distantFacades,moonSpan,paintMoon,palettes,setPalette};if(typeof module!=='undefined')module.exports=root.CityEnvironment;
 })(typeof window==='undefined'?globalThis:window);
