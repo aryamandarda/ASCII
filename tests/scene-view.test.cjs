@@ -1,0 +1,4 @@
+const assert=require('node:assert/strict'),{layout,pan}=require('../dist/projects/ASCII/nyc/scene-view.js'),grid=require('../dist/projects/ASCII/nyc/character-grid.js');
+for(const [w,h] of [[390,844],[844,390],[375,667],[667,375]]){const cover=layout(w,h,true),fit=layout(w,h,false);assert(cover.width>=w-1e-8&&cover.height>=h-1e-8);assert(fit.width<=w+1e-8&&fit.height<=h+1e-8);assert(Math.abs(cover.width/cover.height-1280/854)<1e-8);assert(grid.columnsForView(w,h,'cover')>=grid.columnsForView(w,h));assert.equal(pan(.5,1e6,cover.overflowX),cover.overflowX>1?0:.5);assert.equal(pan(.5,-1e6,cover.overflowY),cover.overflowY>1?1:.5)}
+assert.equal(pan(.5,100,0),.5);assert.equal(pan(.5,100,400),.25);
+console.log('PASS: portrait/landscape fit and cover, bounded panning, aspect ratio and character density');
