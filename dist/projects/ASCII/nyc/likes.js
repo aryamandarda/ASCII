@@ -20,10 +20,10 @@
   }
   button.onclick=async()=>{
     if(busy)return;if(!loaded){await refresh();if(!loaded)return}
-    busy=true;button.disabled=true;button.setAttribute('aria-busy','true');
-    try{render(await request({method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({liked:!liked})}));status.textContent=liked?'Liked. Thank you!':'Like removed.'}
+    busy=true;status.textContent='';
+    try{render(await request({method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({liked:!liked})}));status.textContent=''}
     catch{status.textContent='Could not save your like. Please try again.'}
-    finally{busy=false;button.disabled=false;button.removeAttribute('aria-busy')}
+    finally{busy=false;button.disabled=false}
   };
   document.addEventListener('visibilitychange',()=>{if(!document.hidden&&Date.now()-lastRead>30000)refresh()});
   refresh();
