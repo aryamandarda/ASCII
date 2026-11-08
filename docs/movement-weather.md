@@ -75,3 +75,7 @@ Run `npm test`. New regression checks cover bone-length conservation, knee flexi
 
 - [PBRT: area lights](https://pbr-book.org/4ed/Light_Sources/Area_Lights) and [diffuse reflection](https://pbr-book.org/4ed/Reflection_Models/Diffuse_Reflection). Basis for the light falloff approximation.
 - [NOAA cloud classification](https://www.weather.gov/lmk/cloud_classification). Passing layers, opaque stratus/nimbostratus, and fronts that thicken into overcast.
+
+## Character rendering for pedestrians
+
+The walking rig remains the motion source. Its visible coverage selects a separate glyph atlas with 18% background color and brighter character ink, so clothing and body shading read as character clusters. Depth-sorted cars and furniture erase covered person cells from this mask. Both masks clear every frame, and atlas selection is part of the cell cache key to prevent trails when a person moves. The enlarged mechanics inspector shows the underlying rig; judge the finished character treatment in the main scene.

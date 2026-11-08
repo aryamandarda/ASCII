@@ -12,7 +12,7 @@ assert(life.trafficAt(17).count>life.trafficAt(4).count*10);assert(life.trafficA
 global.SunCalc=require('../dist/projects/ASCII/nyc/vendor/suncalc.js');global.CityCalendar=require('../dist/projects/ASCII/nyc/calendar.js');global.BillboardModel=model;const traffic=require('../dist/projects/ASCII/nyc/traffic.js');
 // Integration: fresh page advances on its own, no video autoplay or user gesture.
 const canvases=[],images=[],listeners={};let nextFrame,resizeCallback;
-class Context {constructor(){this.draws=[];this.uploads=[]}createImageData(w,h){return{data:new Uint8ClampedArray(w*h*4)}}putImageData(...args){this.uploads.push(args)}drawImage(...a){this.draws.push(a)}getImageData(x,y,w,h){return{data:new Uint8ClampedArray(w*h*4).fill(160)}}fillRect(){}fillText(){}beginPath(){}lineTo(){}moveTo(){}closePath(){}save(){}restore(){}clip(){}transform(){}setTransform(){}fill(){}stroke(){}ellipse(){}translate(){}scale(){}createLinearGradient(){return{addColorStop(){}}}createRadialGradient(){return{addColorStop(){}}}}
+class Context {constructor(){this.draws=[];this.uploads=[]}createImageData(w,h){return{data:new Uint8ClampedArray(w*h*4)}}putImageData(...args){this.uploads.push(args)}drawImage(...a){this.draws.push(a)}getImageData(x,y,w,h){return{data:new Uint8ClampedArray(w*h*4).fill(160)}}clearRect(){}fillRect(){}fillText(){}beginPath(){}lineTo(){}moveTo(){}closePath(){}save(){}restore(){}clip(){}transform(){}setTransform(){}fill(){}stroke(){}ellipse(){}translate(){}scale(){}createLinearGradient(){return{addColorStop(){}}}createRadialGradient(){return{addColorStop(){}}}}
 function canvas(){const c={dataset:{},style:{setProperty(){}},width:0,height:0,context:new Context(),getContext(){return this.context}};canvases.push(c);return c}
 class ImageMock {constructor(){this.naturalWidth=240;this.naturalHeight=360;images.push(this)}}
 const elements={art:canvas(),ambient:canvas()};function element(id){return elements[id]||(elements[id]={style:{setProperty(){}},attributes:{},clientWidth:390,clientHeight:844,setAttribute(k,v){this.attributes[k]=v},removeAttribute(){},focus(){}})}
@@ -33,6 +33,11 @@ const sandbox={CityWeather:{...weather,paintSurfaces(){},paintPrecipitation(){},
  const columns=390,rows=grid.size(columns).rows;
  assert.equal(out.width,columns*6);assert.equal(out.height,rows*10);assert.equal(out.dataset.columns,390);
  assert(out.context.uploads.length>0,'Character pixels must reach the visible canvas');assert.equal(out.context.uploads[0][0].data.length,out.width*out.height*4);assert(out.context.uploads[0][0].data.every(v=>v===160),'Every visible cell is copied from the glyph atlas');
+ // Identical scene colors must still repaint when human coverage changes.
+ vm.runInNewContext(`humanPixels.fill(0xff334455);ms.getImageData=()=>({data:new Uint8ClampedArray(cols*rows*4).fill(255)});asciiPass()`,sandbox);
+ assert.equal(new Uint32Array(out.context.uploads.at(-1)[0].data.buffer)[0],0xff334455,'Covered cells use character-first human atlas');
+ vm.runInNewContext(`ms.getImageData=()=>({data:new Uint8ClampedArray(cols*rows*4)});asciiPass()`,sandbox);
+ assert(out.context.uploads.at(-1)[0].data.every(v=>v===160),'Vacated cells restore scene atlas even with unchanged RGB');
  assert.equal(sample.context.draws[0][0],world);assert.deepEqual(sample.context.draws[0].slice(1),[0,0,columns,rows]);assert(world.context.draws.length>model.boards.length);
  const html=fs.readFileSync('dist/projects/ASCII/nyc/index.html','utf8');assert(!html.includes('id="density"'),'The density slider is removed');
  elements.time.value='240';elements.time.oninput();const quiet=+out.dataset.people;elements.time.value='1020';elements.time.oninput();assert(+out.dataset.people>quiet*3);

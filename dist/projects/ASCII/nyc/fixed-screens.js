@@ -9,6 +9,13 @@ const ag=atlas.getContext('2d');ag.font='bold 10px monospace';ag.textAlign='cent
 palette.forEach(([r,g,b],ci)=>{const gain=Math.min(1.16,255/Math.max(1,r,g,b));for(let j=0;j<8;j++){ag.fillStyle=`rgb(${r*.82},${g*.82},${b*.82})`;ag.fillRect(ci*6,j*10,6,10);ag.fillStyle=`rgb(${r*gain},${g*gain},${b*gain})`;ag.fillText(ramp[j],ci*6+3,j*10+5)}});
 
 const atlasPixels=new Uint32Array(ag.getImageData(0,0,atlas.width,atlas.height).data.buffer);
+// People use character ink with dark negative space instead of solid cell fills.
+const humanAtlas=document.createElement('canvas');humanAtlas.width=atlas.width;humanAtlas.height=atlas.height;
+const hg=humanAtlas.getContext('2d');hg.font='bold 10px monospace';hg.textAlign='center';hg.textBaseline='middle';
+palette.forEach(([r,g,b],ci)=>{for(let j=0;j<8;j++){hg.fillStyle=`rgb(${r*.18},${g*.18},${b*.18})`;hg.fillRect(ci*6,j*10,6,10);hg.fillStyle=`rgb(${Math.min(255,r*1.45+20)},${Math.min(255,g*1.45+20)},${Math.min(255,b*1.45+20)})`;hg.fillText(' .:+x%#@'[Math.max(2,j)],ci*6+3,j*10+5)}});
+const humanPixels=new Uint32Array(hg.getImageData(0,0,humanAtlas.width,humanAtlas.height).data.buffer);
+const humanMask=document.createElement('canvas');humanMask.width=1280;humanMask.height=854;const hm=humanMask.getContext('2d');
+const maskSample=document.createElement('canvas'),ms=maskSample.getContext('2d',{willReadFrequently:true});
 let outputPixels,outputWords;
 
 let environment,ready=false,playing=!matchMedia('(prefers-reduced-motion: reduce)').matches,epoch=Date.now(),speed=1,direction=1,time=epoch/60000,last=0,lastPaint=0,cols=390,rows=156,previousCells,frameNumber=0,immersed=false;
@@ -42,17 +49,18 @@ screen.light=CityEnvironment.billboardLight(screen.p,rgb);
 }
 function asciiPass(){
   sc.imageSmoothingEnabled=true;sc.imageSmoothingQuality='high';sc.drawImage(world,0,0,cols,rows);
+  ms.clearRect(0,0,cols,rows);ms.drawImage(humanMask,0,0,cols,rows);const coverage=ms.getImageData(0,0,cols,rows).data;
   const d=sc.getImageData(0,0,cols,rows).data;let minRow=rows,maxRow=-1;
   // Copy glyph pixels into one reusable image instead of issuing up to 180,000
   // canvas draw calls per frame. Palette, glyphs and character sizes are identical.
   for(let y=0;y<rows;y++)for(let x=0;x<cols;x++){
-    const index=y*cols+x,k=index*4,n=cellCode(d[k],d[k+1],d[k+2],x,y);if(previousCells[index]===n)continue;
+    const index=y*cols+x,k=index*4,human=coverage[k+3]>180,n=cellCode(d[k],d[k+1],d[k+2],x,y)+(human?4096:0);if(previousCells[index]===n)continue;
     previousCells[index]=n;minRow=Math.min(minRow,y);maxRow=Math.max(maxRow,y);
-    const ci=n>>3,j=n&7;
+    const ci=(n&4095)>>3,j=n&7,pixels=human?humanPixels:atlasPixels;
     for(let row=0;row<10;row++){
       const source=(j*10+row)*atlas.width+ci*6,target=(y*10+row)*canvas.width+x*6;
-      outputWords[target]=atlasPixels[source];outputWords[target+1]=atlasPixels[source+1];outputWords[target+2]=atlasPixels[source+2];
-      outputWords[target+3]=atlasPixels[source+3];outputWords[target+4]=atlasPixels[source+4];outputWords[target+5]=atlasPixels[source+5];
+      outputWords[target]=pixels[source];outputWords[target+1]=pixels[source+1];outputWords[target+2]=pixels[source+2];
+      outputWords[target+3]=pixels[source+3];outputWords[target+4]=pixels[source+4];outputWords[target+5]=pixels[source+5];
     }
   }
   if(maxRow>=minRow)output.putImageData(outputPixels,0,0,0,minRow*10,canvas.width,(maxRow-minRow+1)*10);
@@ -67,15 +75,16 @@ function draw(){if(!ready)return;const start=performance.now();time=epoch/60000;
   for(const screen of screens){if(!screen.light)continue;ctx.save();path(screen.p);ctx.clip();project(screen);ctx.restore()}
   const tAds=performance.now();CityWeather.paintSurfaces(ctx,weather,light);CityEnvironment.paintBillboardGlow(ctx,light,screens,true);for(const car of cars)CityTraffic.groundLights(ctx,car,light);
   const lamps=screens.map(s=>s.light).filter(Boolean),receiver=(p,h)=>CityEnvironment.receiverLight(light,p.x,p.y,h,lamps);
-  const layers=[...cars.map(c=>({y:c.y,paint:()=>CityTraffic.paintCar(ctx,c,receiver(c,.8))})),...people.map(p=>({y:p.y,paint:()=>CityLife.paintWalker(ctx,p,receiver(p,1),weather)})),...CityLife.furnitureLayers(weather,light).map(layer=>({y:layer.y,paint:()=>layer.paint(ctx)}))].sort((a,b)=>a.y-b.y);
-  for(const layer of layers)layer.paint();
+  const layers=[...cars.map(c=>({y:c.y,paint:(g=ctx)=>CityTraffic.paintCar(g,c,receiver(c,.8))})),...people.map(p=>({y:p.y,human:true,paint:(g=ctx)=>CityLife.paintWalker(g,p,receiver(p,1),weather)})),...CityLife.furnitureLayers(weather,light).map(layer=>({y:layer.y,paint:(g=ctx)=>layer.paint(g)}))].sort((a,b)=>a.y-b.y);
+  hm.clearRect(0,0,1280,854);
+  for(const layer of layers){layer.paint();hm.globalCompositeOperation=layer.human?'source-over':'destination-out';layer.paint(hm)}
   CityWeather.paintPrecipitation(ctx,weather,light,epoch);
   const tScene=performance.now();asciiPass();const tAscii=performance.now();canvas.dataset.renderStages=JSON.stringify({environment:tEnvironment-start,crowd:tCrowd-tEnvironment,ads:tAds-tCrowd,scene:tScene-tAds,ascii:tAscii-tScene});ambient.drawImage(canvas,0,0,120,80);updateTime();canvas.dataset.weather=weather.kind;canvas.dataset.snow=weather.groundSnow.toFixed(2);canvas.dataset.cloud=weather.cloud.toFixed(2);canvas.dataset.temperature=weather.temperature.toFixed(1);canvas.dataset.moonPhase=light.moonPhase.toFixed(3);canvas.dataset.renderMs=(performance.now()-start).toFixed(1);canvas.dataset.columns=cols;canvas.dataset.adAssignments=screens.map(s=>s.lastAd).join(',');canvas.dataset.frame=++frameNumber;canvas.dataset.simulationTime=time.toFixed(4);canvas.dataset.epoch=epoch.toFixed(0);canvas.dataset.date=light.date;canvas.dataset.people=people.length;canvas.dataset.vehicles=cars.length;canvas.dataset.vehicleDirections=cars.map(c=>c.lane).join(',');canvas.dataset.windows=environment.windowCount;canvas.dataset.distantWindows=environment.distantWindowCount;canvas.dataset.cloudMode=weather.cloud>.78?'overcast':weather.cloud>.37?'passing':'clear';canvas.dataset.hour=light.hour.toFixed(3);canvas.dataset.speed=speed;canvas.dataset.direction=direction;canvas.dataset.sunrise=new Date(light.sunrise).toISOString();canvas.dataset.sunset=new Date(light.sunset).toISOString();canvas.dataset.motionFrames=ads.slice(0,5).map(a=>Math.floor(time*a.fps)%a.frames).join(',');canvas.dataset.skyPixels=environment.skyPixels;
 }
 function resizeGrid(){
   const view=el('surface'),next=columnsForView(view.clientWidth,view.clientHeight);
   if(previousCells&&next===cols)return;
-  cols=next;rows=size(cols).rows;canvas.width=cols*6;canvas.height=rows*10;sample.width=cols;sample.height=rows;previousCells=new Uint16Array(cols*rows);previousCells.fill(65535);outputPixels=output.createImageData(canvas.width,canvas.height);outputWords=new Uint32Array(outputPixels.data.buffer);draw()}
+  cols=next;rows=size(cols).rows;canvas.width=cols*6;canvas.height=rows*10;sample.width=cols;sample.height=rows;maskSample.width=cols;maskSample.height=rows;previousCells=new Uint16Array(cols*rows);previousCells.fill(65535);outputPixels=output.createImageData(canvas.width,canvas.height);outputWords=new Uint32Array(outputPixels.data.buffer);draw()}
 
 let resizeTimer;
 const gridObserver=new ResizeObserver(()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(()=>{if(ready)resizeGrid()},100)});
