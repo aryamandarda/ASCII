@@ -16,10 +16,10 @@
   function footCycle(phase,stride=1.35,height=1.75){
     const u=mod(phase/TAU,1),length=stride/height,span=length*.60;
     let forward,lift,roll;
-    if(u<.60){forward=span/2-length*u;lift=.012*(1-smooth(u/.12))+.045*smooth((u-.43)/.17);roll=-.30*(1-smooth(u/.12))+.46*smooth((u-.43)/.17)}
+    if(u<.60){forward=span/2-length*u;lift=.012*(1-smooth(u/.12))+.022*smooth((u-.43)/.17);roll=-.30*(1-smooth(u/.12))+.20*smooth((u-.43)/.17)}
     else{const t=(u-.6)/.4,t2=t*t,t3=t2*t;
       forward=(2*t3-3*t2+1)*(-span/2)+(t3-2*t2+t)*(-length*.4)+(-2*t3+3*t2)*(span/2)+(t3-t2)*(-length*.4);
-      lift=.045*(1-smooth(t))+.012*smooth((t-.75)/.25)+.008*Math.sin(Math.PI*t)**2;roll=mix(.46,-.30,smooth(t));
+      lift=.022*(1-smooth(t))+.012*smooth((t-.75)/.25)+.004*Math.sin(Math.PI*t)**2;roll=mix(.20,-.30,smooth(t));
     }
     return{u,forward,lift,roll,stance:u<.60};
   }
@@ -39,7 +39,7 @@
     const pelvisYaw=.065*Math.cos(phase)*walking;
     const shoulderYaw=-.055*Math.cos(phase)*walking;
     const lean=(.018+.006*Math.sin(phase*2))*walking;
-    let hipHeight=.491+.003*Math.cos(2*phase);
+    let hipHeight=.505+.002*Math.cos(2*phase);
     hipHeight=Math.min(hipHeight,...feet.map(f=>{
       const hipForward=f.side*body.hipWidth*(p.build||1)*Math.sin(pelvisYaw);
       return .039+f.lift+Math.sqrt(Math.max(.01,(body.thigh+body.shank-.004)**2-(f.forward-hipForward)**2));
@@ -48,7 +48,7 @@
     const drop=(.510-hipHeight)*(1-sit)+.205*sit,sway=Math.sin(phase)*.004*walking;
     // Small spinal compensation attenuates head bounce while keeping the skull
     // attached to shoulders. Torso vertices interpolate between both frames.
-    const upperDrop=mix(drop,.018+.28*(drop-.018),walking);
+    const upperDrop=mix(drop,.018+.05*(drop-.018),walking);
     const yaw=p.heading===undefined?Math.atan2(p.dx||1,-(p.vz||-.2)):p.heading;
     const build=p.build||1;
     const hip=[sway,body.hip+drop,0],shoulder=[sway*.45,body.shoulder+upperDrop, lean];
@@ -60,7 +60,10 @@
       return{side:f.side,hip:joint,knee,ankle,stance:f.stance,roll:f.roll*walking};
     });
     const arms=[-1,1].map((side,i)=>{
-      const a=phase+i*Math.PI,angle=-clamp(feet[i].forward/(stride/height*.30),-1,1)*.32*walking*(p.armSwing||1),elbowFlex=.22+.20*(.5+.5*Math.cos(a));
+      // Opposite feet share one stride phase. Their relative advance makes
+      // arms alternate exactly, without both drifting behind bent thighs.
+      const opposite=legs[1-i],own=legs[i];
+      const angle=Math.atan2(opposite.ankle[2]-own.ankle[2],1.0)*.80*(p.armSwing||1),elbowFlex=.16+.12*Math.max(0,-Math.sin(angle));
       const shoulderJoint=[shoulder[0]+side*.112*build,shoulder[1]+.015,shoulder[2]+side*.112*build*Math.sin(shoulderYaw)];
       const upper=mix(angle,-.53,sit),lower=mix(angle+elbowFlex,-1.35,sit);
       const elbow=[shoulderJoint[0]+side*.012,shoulderJoint[1]+Math.sqrt(body.upperArm**2-.012**2)*Math.cos(upper),shoulderJoint[2]+Math.sqrt(body.upperArm**2-.012**2)*Math.sin(upper)];

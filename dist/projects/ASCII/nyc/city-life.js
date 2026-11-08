@@ -23,7 +23,7 @@
   function path(points){return groundPath(points.map(unproject))}
   // Broad, repeatable personal pace; the crowd strolls rather than marches.
   const walkingSpeed=id=>.54+.46*random(id+6)**.75;
-  function appearance(id){const speed=walkingSpeed(id);return{id,speed,coat:coats[mod(id,coats.length)],skin:skins[mod(id,skins.length)],hair:['#29252b','#49352d','#ab946d','#8b8d94'][mod(id,4)],height:.93+random(id+11)*.14,build:.88+random(id+16)*.25,stride:.98+.24*(speed-.54)/.46+random(id+26)*.10,gait:.75+random(id+31)*.40,armSwing:.7+random(id+32)*.55,bob:.0015+random(id+36)*.002,paceInterval:9+random(id+38)*18,phase:random(id+39)*Math.PI*2,radius:.225+random(id+41)*.035}};
+  function appearance(id){const speed=walkingSpeed(id);return{id,speed,coat:coats[mod(id,coats.length)],skin:skins[mod(id,skins.length)],hair:['#29252b','#49352d','#ab946d','#8b8d94'][mod(id,4)],height:.93+random(id+11)*.14,build:.88+random(id+16)*.25,stride:1.13+.276*(speed-.54)/.46+random(id+26)*.115,gait:.75+random(id+31)*.40,armSwing:.7+random(id+32)*.55,bob:.0015+random(id+36)*.002,paceInterval:9+random(id+38)*18,phase:random(id+39)*Math.PI*2,radius:.225+random(id+41)*.035}};
   // A few occupied pockets of furniture, with clear walking space between them.
   // Chair angles are ground-plane bearings, so opposite chairs really face inward.
   const tables=[
