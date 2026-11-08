@@ -28,3 +28,13 @@ for(let yaw=0;yaw<Math.PI*2;yaw+=.025){
  assert(R.torsoMesh(false).reduce((sum,f)=>sum+polygonArea(f.points.map(p=>R.project(p,yaw))),0)>.035,'Torso must not disappear sideways');
  assert(R.neckMesh().reduce((sum,f)=>sum+polygonArea(f.points.map(p=>R.project(p,yaw))),0)>.0015,'Neck must have solid sides');
 }
+
+// Regression: the upper body must not ride the old ~6 cm pelvis excursion.
+for(const stride of [.98,1.18,1.25]){
+ const poses=Array.from({length:240},(_,i)=>R.pose({step:i/240*Math.PI*2,stride,height:1}));
+ const range=key=>Math.max(...poses.map(p=>p[key][1]))-Math.min(...poses.map(p=>p[key][1]));
+ assert(range('hip')*175<3.0,'Pelvis rise stays modest at supported strolling strides');
+ assert(range('head')*175<.85,'Head stabilization keeps bounce below 8.5 mm');
+ assert(poses.some(p=>Math.abs(p.shoulderYaw)>.04),'Shoulders rotate during stride');
+ assert(poses.every(p=>p.shoulderYaw*p.pelvisYaw<=0),'Shoulders counterrotate against pelvis');
+}

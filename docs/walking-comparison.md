@@ -21,3 +21,9 @@ Grid choices reproduce 680 desktop or 390 phone scene columns using CharacterGri
 ## Next experiment, not yet applied
 
 Keep translation, crowd routing and the common character grid. Compare one controlled candidate with a less rigid torso, less direct head-to-pelvis coupling, revised swing timing/foot clearance, and a coherent profile silhouette. Evaluate the whole character at scene size before adjusting the crowd. Avoid treating the photographic reference as a universal body shape or using its edited playback rate as a speed target.
+
+## Revised candidate
+
+The original renderer is preserved as `dist/gait-study/baseline-rig.js`; the checkbox switches both engine panels at the same phase. The scene now uses the revised rig on the review branch. The character grid is unchanged.
+
+Pelvis height follows a low-amplitude trajectory with a leg-reach constraint rather than maximizing support-leg extension. The torso connects that pelvis to a stabilized shoulder frame; the head remains attached to it. Shoulder/pelvis twist oppose one another, with a small varying forward inclination. Swing clearance is reduced while preserving heel/toe contact. Thicker legs, connected visible shoes, and a continuous profile contour improve the silhouette. At the 1.18 m test stride, sampled head excursion drops from 5.91 cm to 0.37 cm and pelvis excursion to 1.33 cm. These are engine measurements, not measurements extracted from the reference.

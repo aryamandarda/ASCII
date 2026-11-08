@@ -19,7 +19,7 @@
     if(u<.60){forward=span/2-length*u;lift=.012*(1-smooth(u/.12))+.045*smooth((u-.43)/.17);roll=-.30*(1-smooth(u/.12))+.46*smooth((u-.43)/.17)}
     else{const t=(u-.6)/.4,t2=t*t,t3=t2*t;
       forward=(2*t3-3*t2+1)*(-span/2)+(t3-2*t2+t)*(-length*.4)+(-2*t3+3*t2)*(span/2)+(t3-t2)*(-length*.4);
-      lift=.045*(1-smooth(t))+.012*smooth((t-.75)/.25)+.045*Math.sin(Math.PI*t)**2;roll=mix(.46,-.30,smooth(t));
+      lift=.045*(1-smooth(t))+.012*smooth((t-.75)/.25)+.008*Math.sin(Math.PI*t)**2;roll=mix(.46,-.30,smooth(t));
     }
     return{u,forward,lift,roll,stance:u<.60};
   }
@@ -34,20 +34,26 @@
     const feet=[-1,1].map((side,i)=>({side,...footCycle(phase+i*Math.PI,stride,height)}));
     // Solve pelvis height from the weight-bearing limb, keeping both leg lengths
     // fixed. Double support limits extension instead of stretching the shins.
-    let hipHeight=.505;
-    const supports=feet.filter(f=>f.stance);
-    if(supports.length)hipHeight=Math.min(...supports.map(f=>{
-      const loading=.009*Math.sin(Math.PI*clamp(f.u/.20,0,1))**2;
-      return .039+f.lift+Math.sqrt(Math.max(.01,(body.thigh+body.shank-.004-loading)**2-f.forward*f.forward));
+    // Keep the pelvis close to a level trajectory rather than raising it to
+    // the maximum extension of whichever leg happens to bear weight.
+    const pelvisYaw=.065*Math.cos(phase)*walking;
+    const shoulderYaw=-.055*Math.cos(phase)*walking;
+    const lean=(.018+.006*Math.sin(phase*2))*walking;
+    let hipHeight=.491+.003*Math.cos(2*phase);
+    hipHeight=Math.min(hipHeight,...feet.map(f=>{
+      const hipForward=f.side*body.hipWidth*(p.build||1)*Math.sin(pelvisYaw);
+      return .039+f.lift+Math.sqrt(Math.max(.01,(body.thigh+body.shank-.004)**2-(f.forward-hipForward)**2));
     }));
-    hipHeight=Math.min(hipHeight,...feet.map(f=>.039+f.lift+Math.sqrt(Math.max(.01,(body.thigh+body.shank-.002)**2-f.forward*f.forward))));
     hipHeight=mix(.505,hipHeight,walking);
-    const drop=(.510-hipHeight)*(1-sit)+.205*sit,sway=Math.sin(phase)*.005*walking;
+    const drop=(.510-hipHeight)*(1-sit)+.205*sit,sway=Math.sin(phase)*.004*walking;
+    // Small spinal compensation attenuates head bounce while keeping the skull
+    // attached to shoulders. Torso vertices interpolate between both frames.
+    const upperDrop=mix(drop,.018+.28*(drop-.018),walking);
     const yaw=p.heading===undefined?Math.atan2(p.dx||1,-(p.vz||-.2)):p.heading;
     const build=p.build||1;
-    const hip=[sway,body.hip+drop,0],shoulder=[sway*.45,body.shoulder+drop, .012*walking];
+    const hip=[sway,body.hip+drop,0],shoulder=[sway*.45,body.shoulder+upperDrop, lean];
     const legs=feet.map(f=>{
-      const joint=[hip[0]+f.side*body.hipWidth*build,hip[1],0];
+      const joint=[hip[0]+f.side*body.hipWidth*build,hip[1],f.side*body.hipWidth*build*Math.sin(pelvisYaw)];
       const ankle=[joint[0],mix(body.ankle-f.lift*walking,-.039,sit),mix(f.forward*walking,.22,sit)];
       // Seated ankles stay under bent knees; the same IK keeps segment lengths.
       const knee=solveKnee(joint,ankle);
@@ -55,7 +61,7 @@
     });
     const arms=[-1,1].map((side,i)=>{
       const a=phase+i*Math.PI,angle=-clamp(feet[i].forward/(stride/height*.30),-1,1)*.32*walking*(p.armSwing||1),elbowFlex=.22+.20*(.5+.5*Math.cos(a));
-      const shoulderJoint=[shoulder[0]+side*.112*build,shoulder[1]+.015,shoulder[2]];
+      const shoulderJoint=[shoulder[0]+side*.112*build,shoulder[1]+.015,shoulder[2]+side*.112*build*Math.sin(shoulderYaw)];
       const upper=mix(angle,-.53,sit),lower=mix(angle+elbowFlex,-1.35,sit);
       const elbow=[shoulderJoint[0]+side*.012,shoulderJoint[1]+Math.sqrt(body.upperArm**2-.012**2)*Math.cos(upper),shoulderJoint[2]+Math.sqrt(body.upperArm**2-.012**2)*Math.sin(upper)];
       const wrist=[elbow[0],elbow[1]+body.forearm*Math.cos(lower),elbow[2]+body.forearm*Math.sin(lower)];
@@ -63,8 +69,8 @@
     });
     // Head and hair share one frame. No direction threshold, independent hair
     // offsets or per-frame randomness. Very small, continuous gaze anticipation.
-    const head=[shoulder[0],body.headCenter+drop,shoulder[2]],headYaw=yaw+.07*Math.sin((p.travelled||0)*.18+(p.phase||0));
-    return{hip,shoulder,head,yaw,headYaw,drop,legs,arms,walking};
+    const head=[shoulder[0],body.headCenter+upperDrop,shoulder[2]+.009*walking],headYaw=yaw+shoulderYaw*.4;
+    return{hip,shoulder,head,yaw,headYaw,drop,upperDrop,pelvisYaw,shoulderYaw,lean,legs,arms,walking};
   }
   const project=(point,yaw)=>[point[0]*Math.cos(yaw)+point[2]*Math.sin(yaw),point[1]+.16*(point[2]*Math.cos(yaw)-point[0]*Math.sin(yaw))];
   function shell(rings){
@@ -82,12 +88,15 @@
     const P=point=>{const q=project(point,r.yaw);return[x+q[0]*h,y+q[1]*h]};
     function line(hex,width,points,gain=1){g.strokeStyle=color(hex,gain);g.lineWidth=h*width;g.lineCap='round';g.lineJoin='round';g.beginPath();points.forEach((v,i)=>i?g.lineTo(...P(v)):g.moveTo(...P(v)));g.stroke()}
     function poly(hex,points,gain=1){g.fillStyle=color(hex,gain);g.beginPath();points.forEach((v,i)=>i?g.lineTo(...P(v)):g.moveTo(...P(v)));g.closePath();g.fill()}
-    const torso=(lateral,vertical,forward=0)=>[lateral*(p.build||1)+r.shoulder[0],vertical+r.drop,forward];
+    const torso=(lateral,vertical,forward=0)=>{
+      const t=clamp((-.510-vertical)/.316,0,1),twist=mix(r.pelvisYaw,r.shoulderYaw,t),lx=lateral*(p.build||1);
+      return[lx*Math.cos(twist)-forward*Math.sin(twist)+mix(r.hip[0],r.shoulder[0],t),vertical+mix(r.drop,r.upperDrop,t),forward*Math.cos(twist)+lx*Math.sin(twist)+r.lean*t];
+    };
     const pants=['#354054','#536178','#383b42','#56514b'][mod(p.id,4)];
     g.save();g.globalAlpha=.19;g.fillStyle='#101321';g.beginPath();g.ellipse(x,y+1,h*.15,h*.021,0,0,TAU);g.fill();g.globalAlpha=1;
-    const leg=l=>{line(pants,.074,[l.hip,l.knee],l.side<0?.82:1);line(pants,.055,[l.knee,l.ankle],l.side<0?.86:1);
+    const leg=l=>{line(pants,.084,[l.hip,l.knee],l.side<0?.82:1);line(pants,.062,[l.knee,l.ankle],l.side<0?.86:1);
       const a=l.ankle,toe=[a[0],a[1]+.022+Math.sin(l.roll)*.10,a[2]+.10],heel=[a[0],a[1]+.020-Math.sin(l.roll)*.04,a[2]-.04];
-      line('#232833',.038,[heel,toe]);line('#a3a5a2',.009,[[heel[0],heel[1]+.012,heel[2]],[toe[0],toe[1]+.012,toe[2]]]);
+      line('#46505c',.040,[heel,toe]);line('#46505c',.032,[a,[a[0],a[1]+.018,a[2]+.022]]);line('#a3a5a2',.009,[[heel[0],heel[1]+.012,heel[2]],[toe[0],toe[1]+.012,toe[2]]]);
       line(pants,.012,[l.hip,l.knee,l.ankle],1.16);
     };
     r.legs.slice().sort((a,b)=>project(a.hip,r.yaw)[1]-project(b.hip,r.yaw)[1]).forEach(leg);
@@ -111,9 +120,14 @@
     paintShell(neckMesh(),p.skin);
     if(cold)line(p.coat,.028,[torso(-.045,-.844,.02),torso(.045,-.844,.02)],.73);
     const head=P(r.head),hx=head[0],hy=head[1],rx=h*.052,ry=h*body.headRadius,face=Math.cos(r.headYaw),profile=Math.sin(r.headYaw);
-    g.save();g.beginPath();g.ellipse(hx,hy,rx,ry,0,0,TAU);g.clip();g.fillStyle=color(p.hair);g.fillRect(hx-rx,hy-ry,rx*2,ry*2);
+    g.save();g.beginPath();
+    // A stable forehead, nose bridge, jaw and chin replace the oval mask in
+    // profile; front/back smoothly retain the rounded skull silhouette.
+    const profileShape=[[-.82,-.7],[-.35,-1],[.45,-.92],[.75,-.55],[.78,-.12],[1.12,.14],[.78,.23],[.77,.62],[.44,.91],[-.18,.87],[-.72,.43],[-.95,-.15]];
+    const strength=Math.abs(profile),sign=profile<0?-1:1;
+    profileShape.forEach(([xx,yy],i)=>{const roundX=xx/Math.max(1,Math.abs(xx))*.96,px=hx+sign*rx*mix(roundX,xx,strength),py=hy+ry*yy;i?g.lineTo(px,py):g.moveTo(px,py)});g.closePath();g.clip();g.fillStyle=color(p.hair);g.fillRect(hx-rx,hy-ry,rx*2,ry*2);
     // Skin visibility varies continuously; hair remains attached to the skull.
-    g.globalAlpha=smooth((face+.35)/.5);g.fillStyle=color(p.skin);g.beginPath();g.ellipse(hx+profile*rx*.60,hy+ry*.19,rx*(.52+.36*Math.max(0,face)),ry*.83,0,0,TAU);g.fill();
+    g.globalAlpha=smooth((face+.35)/.5);g.fillStyle=color(p.skin);g.beginPath();g.ellipse(hx+profile*rx*.60,hy+ry*.19,rx*(.70+.18*Math.max(0,face)),ry*.83,0,0,TAU);g.fill();
     g.globalAlpha=1;g.fillStyle=color(p.hair);g.beginPath();g.ellipse(hx-profile*rx*.1,hy-ry*.65,rx*1.02,ry*(p.id%3===0?.47:.36),0,0,TAU);g.fill();g.restore();
     // Ear and nose are subpixel cues in the distance, visible only nearby.
     if(h>38){g.globalAlpha=smooth((face+.2)/.65);g.fillStyle=color(p.skin,.90);g.beginPath();g.ellipse(hx-profile*rx*.42,hy+ry*.10,h*.010,h*.016,0,0,TAU);g.fill();
