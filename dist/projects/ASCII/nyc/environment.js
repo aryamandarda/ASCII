@@ -61,7 +61,7 @@
   }
   let groundCanvas,groundContext,groundPixels;
   let haloCanvas,haloContext;
-  function paintBillboardGlow(g,l,screens,ground=false,skyMask){
+  function paintBillboardGlow(g,l,screens,ground=false,skyMask,wetness=0){
     if(l.night<=0)return;
     const lamps=screens.map(s=>s.light).filter(lamp=>lamp&&lamp.power>.01);
     if(!ground&&skyMask){if(!haloCanvas){haloCanvas=document.createElement('canvas');haloCanvas.width=W;haloCanvas.height=H;haloContext=haloCanvas.getContext('2d')}haloContext.clearRect(0,0,W,H);paintBillboardGlow(haloContext,l,screens);haloContext.globalCompositeOperation='destination-out';haloContext.drawImage(skyMask,0,0);haloContext.globalCompositeOperation='source-over';g.save();g.globalCompositeOperation='screen';g.drawImage(haloCanvas,0,0);g.restore();return}
@@ -71,7 +71,7 @@
       const data=groundPixels.data;
       for(let y=0;y<86;y++)for(let x=0;x<128;x++){
         const c=groundLightAt((x+.5)*W/128,(y+.5)*H/86,l.night,lamps),i=(y*128+x)*4;
-        data[i]=c[0];data[i+1]=c[1];data[i+2]=c[2];data[i+3]=Math.round(c[3]*255);
+        data[i]=c[0];data[i+1]=c[1];data[i+2]=c[2];data[i+3]=Math.round(Math.min(.78,c[3]*(1+wetness*.85))*255);
       }
       groundContext.putImageData(groundPixels,0,0);g.imageSmoothingEnabled=true;g.drawImage(groundCanvas,0,0,W,H);
     }else for(const lamp of lamps){

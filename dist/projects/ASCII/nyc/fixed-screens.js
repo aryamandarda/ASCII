@@ -74,7 +74,7 @@ function draw(){if(!ready)return;const start=performance.now();time=epoch/60000;
   for(const screen of screens){const state=adAt(screen.index,time),ad=ads[state.ad];if(ad.ready)screenAd(screen,ad,state,light)}
   CityEnvironment.paintBillboardGlow(ctx,light,screens,false,environment.skyMask);
   for(const screen of screens){if(!screen.light)continue;ctx.save();path(screen.p);ctx.clip();project(screen);ctx.restore()}
-  const tAds=performance.now();CityWeather.paintSurfaces(ctx,weather,light);CityEnvironment.paintBillboardGlow(ctx,light,screens,true);for(const car of cars)CityTraffic.groundLights(ctx,car,light);
+  const tAds=performance.now();CityWeather.paintSurfaces(ctx,weather,light);CityEnvironment.paintBillboardGlow(ctx,light,screens,true,undefined,weather.wetness);for(const car of cars)CityTraffic.groundLights(ctx,car,light);
   const lamps=screens.map(s=>s.light).filter(Boolean),receiver=(p,h)=>CityEnvironment.receiverLight(light,p.x,p.y,h,lamps);
   const layers=[...cars.map(c=>({y:c.y,paint:(g=ctx)=>CityTraffic.paintCar(g,c,receiver(c,.8))})),...people.map(p=>({y:p.y,human:true,paint:(g=ctx)=>CityLife.paintWalker(g,p,receiver(p,1),weather)})),...CityLife.furnitureLayers(weather,light).map(layer=>({y:layer.y,paint:(g=ctx)=>layer.paint(g)}))].sort((a,b)=>a.y-b.y);
   hm.clearRect(0,0,1280,854);

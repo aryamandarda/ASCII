@@ -123,21 +123,38 @@
     }
   }
   function paintFurnitureSnow(g,table,w,l){if(w.roofSnow<.05)return;const h=root.CityLife.tableScale(table),depth=clamp(w.roofSnow*.25,0,2.6);g.save();g.fillStyle=l.day>.5?'#e1e7e9':'#a5b5c5';g.globalAlpha=clamp(w.roofSnow/3,0,.92);g.beginPath();g.ellipse(table.x,table.y-h*.43-depth,h*.285*table.size,h*.055,0,0,Math.PI*2);g.fill();g.restore()}
+  // Upward-looking camera: its ground horizon is y=649. Gravity is world
+  // vertical, so projected paths fan outward instead of sliding down the glass.
+  const cameraPitch=.14,cameraFocal=950;
+  function projectWeatherPoint(x,y,z){
+    const c=Math.cos(cameraPitch),s=Math.sin(cameraPitch),depth=z*c+y*s;
+    return {x:640+cameraFocal*x/depth,y:515-cameraFocal*(y*c-z*s)/depth,scale:cameraFocal/depth};
+  }
+  function precipitationParticle(i,t,kind,wind=0){
+    const z=6+Math.pow(hash(i+817),.7)*74,c=Math.cos(cameraPitch),s=Math.sin(cameraPitch);
+    const top=z*(cameraFocal*s+615*c)/(cameraFocal*c-615*s);
+    const speed=(kind==='snow'?1.5:18)*( .8+hash(i+93)*.4),life=(top+1.7)/speed;
+    const age=mod(t+hash(i+456)*life,life),x0=(hash(i+123)*1480-740)*(z*c+top*s)/cameraFocal;
+    const position=dt=>{const elapsed=Math.min(life,Math.max(0,age+dt));
+      const flutter=kind==='snow'?.16*Math.sin(elapsed*1.9+i):0;
+      return projectWeatherPoint(x0+elapsed*wind*.035+flutter,top-elapsed*speed,z);
+    };
+    return {point:position(0),tail:position(-.025),alpha:Math.min(1,age/.12,(life-age)/.12),z,age,life};
+  }
   function paintPrecipitation(g,w,l,epoch){
     const rain=Math.sqrt(clamp(w.rain/1.2,0,1)),snow=Math.sqrt(clamp(w.snow/.8,0,1));if(rain+snow<.002)return;
-    // Follow the same simulation clock as the people. Layered speeds and sizes
-    // create depth; fixed particle identities prevent frame-to-frame flicker.
-    const t=epoch/60000,windOffset=35*Math.sin(epoch/(4*HOUR))+65*Math.sin(epoch/(11*HOUR)+1.3);
-    g.save();g.lineCap='round';
-    for(let i=0;i<280;i++){const depth=.3+hash(i+817)*.7,baseX=hash(i+123)*1600,baseY=hash(i+456)*1100;
-      if(snow>.002){const y=mod(baseY+t*(18+depth*36),1000)-70,x=mod(baseX+t*2+windOffset+Math.sin(t*.48+i)*12,1500)-100;
-        g.globalAlpha=snow*(.55+.45*depth);g.fillStyle=l.day>.5?'#f5f7f8':'#d8dfeb';g.beginPath();g.ellipse(x,y,.9+depth*2.1,.9+depth*2.1,0,0,Math.PI*2);g.fill()}
-      if(rain>.002){const y=mod(baseY+t*(330+depth*240),1000)-60,x=mod(baseX+t*8+windOffset*2,1500)-100;
-        g.globalAlpha=rain*(.32+.36*depth);g.strokeStyle=l.day>.5?'#d2dfe8':'#c0d2e3';g.lineWidth=.9+depth*.9;g.beginPath();g.moveTo(x,y);g.lineTo(x+w.wind*3,y+10+depth*17);g.stroke();
-        if(i<45){const X=hash(i+711)*W,Y=696+hash(i+661)*155,age=mod(t*2+hash(i+712),1);if(Y>pavementTop(X)){g.globalAlpha=rain*(1-age)*.22;g.beginPath();g.ellipse(X,Y,.8+age*3,.3+age,0,0,Math.PI*2);g.stroke()}}
-      }
-    }g.restore();
+    const t=epoch/60000;g.save();g.lineCap='round';
+    for(let i=0;i<360;i++)for(const kind of ['rain','snow']){
+      const strength=kind==='rain'?rain:snow;if(strength<.002)continue;
+      const p=precipitationParticle(i,t,kind,w.wind),q=p.point;
+      if(q.x< -30||q.x>W+30||q.y< -30||q.y>H+30)continue;
+      g.globalAlpha=strength*p.alpha*(.45+.35*(1-p.z/80));
+      if(kind==='snow'){const r=clamp(q.scale*.025,.65,2.8);g.fillStyle=l.day>.5?'#f5f7f8':'#d8dfeb';g.beginPath();g.ellipse(q.x,q.y,r,r,0,0,Math.PI*2);g.fill()}
+      else{g.strokeStyle=l.day>.5?'#d2dfe8':'#c0d2e3';g.lineWidth=clamp(q.scale*.012,.65,1.6);g.beginPath();g.moveTo(p.tail.x,p.tail.y);g.lineTo(q.x,q.y);g.stroke()}
+    }
+    if(rain>.002)for(let i=0;i<45;i++){const X=hash(i+711)*W,Y=696+hash(i+661)*155,age=mod(t*2+hash(i+712),1);if(Y>pavementTop(X)){g.globalAlpha=rain*(1-age)*.25;g.strokeStyle='#c0d2e3';g.lineWidth=.7;g.beginPath();g.ellipse(X,Y,.8+age*3,.3+age,0,0,Math.PI*2);g.stroke()}}
+    g.restore();
   }
-  root.CityWeather={normals,climate,front,conditionsAt,weatherAt,simulate,integrate,cloudField,cloudDensity,celestialVisibility,paintClouds,paintSurfaces,paintPrecipitation,paintFurnitureSnow,snowCoverage,ledges,noise};
+  root.CityWeather={projectWeatherPoint,precipitationParticle,normals,climate,front,conditionsAt,weatherAt,simulate,integrate,cloudField,cloudDensity,celestialVisibility,paintClouds,paintSurfaces,paintPrecipitation,paintFurnitureSnow,snowCoverage,ledges,noise};
   if(typeof module!=='undefined')module.exports=root.CityWeather;
 })(typeof window==='undefined'?globalThis:window);
