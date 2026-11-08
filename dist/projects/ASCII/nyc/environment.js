@@ -81,7 +81,7 @@
   let groundCanvas,groundContext,groundPixels;
   let haloCanvas,haloContext;
   function paintBillboardGlow(g,l,screens,ground=false,skyMask,wetness=0){
-    if(l.night<=0)return;
+    if(l.night<=0&&(!ground||wetness<=.01))return;
     const lamps=screens.map(s=>s.light).filter(lamp=>lamp&&lamp.power>.01);
     if(!ground&&skyMask){if(!haloCanvas){haloCanvas=document.createElement('canvas');haloCanvas.width=W;haloCanvas.height=H;haloContext=haloCanvas.getContext('2d')}haloContext.clearRect(0,0,W,H);paintBillboardGlow(haloContext,l,screens);haloContext.globalCompositeOperation='destination-out';haloContext.drawImage(skyMask,0,0);haloContext.globalCompositeOperation='source-over';g.save();g.globalCompositeOperation='screen';g.drawImage(haloCanvas,0,0);g.restore();return}
     g.save();g.globalCompositeOperation='screen';
@@ -94,7 +94,7 @@
       }
       groundContext.putImageData(groundPixels,0,0);g.imageSmoothingEnabled=true;g.drawImage(groundCanvas,0,0,W,H);
       if(wetness>.01){
-        for(let y=0;y<86;y++)for(let x=0;x<128;x++){const c=wetReflectionAt((x+.5)*W/128,(y+.5)*H/86,wetness,lamps),i=(y*128+x)*4;data[i]=c[0];data[i+1]=c[1];data[i+2]=c[2];data[i+3]=Math.round(c[3]*255)}
+        for(let y=0;y<86;y++)for(let x=0;x<128;x++){const c=wetReflectionAt((x+.5)*W/128,(y+.5)*H/86,wetness,lamps),i=(y*128+x)*4;data[i]=c[0];data[i+1]=c[1];data[i+2]=c[2];data[i+3]=Math.round(c[3]*(.25+.35*l.night)*255)}
         groundContext.putImageData(groundPixels,0,0);g.drawImage(groundCanvas,0,0,W,H);
       }
     }else for(const lamp of lamps){
@@ -103,6 +103,26 @@
       halo.addColorStop(0,`rgba(${c},${strength})`);halo.addColorStop(.35,`rgba(${c},${strength*.65})`);halo.addColorStop(1,`rgba(${c},0)`);
       g.fillStyle=halo;g.fillRect(-1,-1,2,2);g.restore();
     }g.restore();
+  }
+  let reflectionCanvas,reflectionContext,reflectionKey;
+  function reflectionAxis(lamp){const source=lamp.position?lamp:{...lamp,...emitterGeometry(lamp)};return 600+1440/source.position[2]}
+  function paintWetScreens(g,l,screens,wetness,drawScreen){
+    if(wetness<=.01)return;
+    if(!reflectionCanvas){reflectionCanvas=document.createElement('canvas');reflectionCanvas.width=W/2;reflectionCanvas.height=H/2;reflectionContext=reflectionCanvas.getContext('2d')}
+    const key=screens.map(s=>s.light?s.cacheKey:'').join('|');
+    if(key!==reflectionKey){reflectionKey=key;const r=reflectionContext;r.clearRect(0,0,W/2,H/2);r.save();r.scale(.5,.5);r.globalCompositeOperation='screen';
+      for(const screen of screens){if(!screen.light)continue;r.save();r.globalAlpha=.55+.25*screen.light.power;r.translate(0,2*reflectionAxis(screen.light));r.scale(1,-1);drawScreen(screen,r);r.restore()}
+      r.restore();
+    }
+    g.save();g.beginPath();g.moveTo(0,704);g.lineTo(550,649);g.lineTo(745,649);g.lineTo(1280,762);g.lineTo(1280,H);g.lineTo(0,H);g.closePath();g.clip();
+    g.globalCompositeOperation='screen';g.imageSmoothingEnabled=true;
+    // Thin horizontal bands soften and break reflected imagery along the paving.
+    // The pattern is stable; the reflected screen footage remains animated.
+    for(let y=650;y<H;y+=3){const texture=.72+.18*Math.sin(y*.61)+.10*Math.sin(y*1.73),offset=1.2*Math.sin(y*.87)+.7*Math.sin(y*.31);
+      g.globalAlpha=wetness*(.16+.16*l.night)*texture*clamp((y-650)/25,0,1);
+      g.drawImage(reflectionCanvas,0,y/2,W/2,1.5,offset,y,W,3);
+    }
+    g.restore();
   }
   const rand=n=>{const k=Math.sin(n*32.17)*43758.5;return k-Math.floor(k)};
   function windowState(id,epoch,l){
@@ -178,13 +198,15 @@
   function neutralizePavement(image){
     const a=image.data,stride=W+1,sum=new Float64Array((W+1)*(H+1));
     for(let y=0;y<H;y++){let row=0;for(let x=0;x<W;x++){const i=(y*W+x)*4;row+=a[i]*.2126+a[i+1]*.7152+a[i+2]*.0722;sum[(y+1)*stride+x+1]=sum[y*stride+x+1]+row}}
+    const meanAt=(x,y,r)=>{const x0=Math.max(0,x-r),x1=Math.min(W,x+r+1),y0=Math.max(0,y-r),y1=Math.min(H,y+r+1);return (sum[y1*stride+x1]-sum[y0*stride+x1]-sum[y1*stride+x0]+sum[y0*stride+x0])/((x1-x0)*(y1-y0))};
     for(let y=649;y<H;y++)for(let x=0;x<W;x++){
-      const edge=x<550?704-x*.10:x<745?649:649+(x-745)*.21,blend=clamp((y-edge-3)/18,0,1);if(!blend)continue;
-      const r=12,x0=Math.max(0,x-r),x1=Math.min(W,x+r+1),y0=Math.max(0,y-r),y1=Math.min(H,y+r+1);
-      const mean=(sum[y1*stride+x1]-sum[y0*stride+x1]-sum[y1*stride+x0]+sum[y0*stride+x0])/((x1-x0)*(y1-y0));
-      const target=160+(y-649)*.025,gain=clamp(target/Math.max(1,mean),.65,1.4),i=(y*W+x)*4;
-      // Remove low-frequency photographic illumination, retain slab joints and grain.
-      for(let c=0;c<3;c++)a[i+c]=Math.round(clamp(a[i+c]*(1-blend+blend*gain),0,255));
+      const edge=x<550?704-x*.10:x<745?649:649+(x-745)*.21,blend=clamp((y-edge-2)/10,0,1);if(!blend)continue;
+      const i=(y*W+x)*4,v=a[i]*.2126+a[i+1]*.7152+a[i+2]*.0722;
+      // Rebuild neutral stone from fine grain and dark slab joints only.
+      // Positive broad contrast was photographed sunlight, not surface material.
+      const grain=clamp(v-meanAt(x,y,2),-8,6),joint=clamp(v-meanAt(x,y,9),-22,0);
+      const neutral=158+(y-649)*.025+grain*.55+joint*.55;
+      for(let c=0;c<3;c++){const material=neutral+clamp((a[i+c]-v)*.14,-3,3);a[i+c]=Math.round(a[i+c]*(1-blend)+material*blend)}
     }
     return image;
   }
@@ -211,5 +233,5 @@
     }
     return{canvas,render,skyMask:mask,skyPixels:tail,windowCount:windows.length,distantWindowCount:windows.filter(w=>w.strength).length};
   }
-  root.CityEnvironment={neutralizePavement,wetReflectionAt,create,skyColor,sunColor,surfaceColor,billboardExposure,billboardLight,paintBillboardGlow,windowState,windowColor,groundLightAt,irradianceAt,receiverLight,materialColor,emitterGeometry,distantFacades,moonSpan,paintMoon,palettes,setPalette};if(typeof module!=='undefined')module.exports=root.CityEnvironment;
+  root.CityEnvironment={paintWetScreens,reflectionAxis,neutralizePavement,wetReflectionAt,create,skyColor,sunColor,surfaceColor,billboardExposure,billboardLight,paintBillboardGlow,windowState,windowColor,groundLightAt,irradianceAt,receiverLight,materialColor,emitterGeometry,distantFacades,moonSpan,paintMoon,palettes,setPalette};if(typeof module!=='undefined')module.exports=root.CityEnvironment;
 })(typeof window==='undefined'?globalThis:window);

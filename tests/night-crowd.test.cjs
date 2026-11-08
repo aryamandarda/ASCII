@@ -10,14 +10,16 @@ for(let slot=33223000;slot<33225000;slot++){
   assert(Math.hypot(p[0]-o.p[0],p[1]-o.p[1])>=o.radius+trip.radius,'Walking targets must clear every table, including adjacent ones');
 }
 const start=CityCalendar.localEpoch('2026-11-07',1080)/60000;
-let evening=0,dawn=0;const initialIds=new Set(L.peopleAt(start).map(p=>p.id));
+let evening=0,dawn=0,rearEvening=0,rearDawn=0;const initialIds=new Set(L.peopleAt(start).map(p=>p.id));
 for(let dt=0;dt<=720;dt+=30){
  const people=L.peopleAt(start+dt);
  for(const p of people)assert(start+dt-p.birth<430,`Pedestrian ${p.id} persists for hours`);
- if(dt<=120)evening+=people.length;
- if(dt>=540&&dt<=660)dawn+=people.length;
+ if(dt<=120){evening+=people.length;rearEvening+=people.filter(p=>p.y<685&&p.x>250&&p.x<850).length;}
+ if(dt>=540&&dt<=660){dawn+=people.length;rearDawn+=people.filter(p=>p.y<685&&p.x>250&&p.x<850).length;}
  if(dt===720)assert(people.every(p=>!initialIds.has(p.id)),'The evening crowd must leave, including the left cluster');
 }
+assert(rearEvening>=70,'Busy crowd continues into the rear plaza rather than stopping at the foreground');
+assert(rearEvening>rearDawn*4,'Distant pedestrians follow time-of-day density too');
 assert(evening>dawn*4,'Actual visible crowd must thin out overnight');
 const quad=[[0,0],[200,0],[200,150],[0,150]],red=E.billboardLight(quad,[180,10,20]),blue=E.billboardLight(quad,[10,30,180]);
 assert(red.color[0]>red.color[2]*5&&blue.color[2]>blue.color[0]*5,'Spill color must follow the active creative');

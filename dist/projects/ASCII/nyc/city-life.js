@@ -54,6 +54,22 @@
     }
     trips.set(slot,result);if(trips.size>8000)trips.delete(trips.keys().next().value);return result;
   }
+  // An additional arrival stream follows the rear plaza, all the way around
+  // the tower. It shares the same locomotion, collision avoidance and clock.
+  function rearTrip(slot){
+    const cacheKey='rear:'+slot;if(trips.has(cacheKey))return trips.get(cacheKey);
+    const birth=slot*SLOT,ratio=trafficAt(CityCalendar.parts(birth*60000).hour).ratio,id=500000000+slot;let result=null;
+    if(random(id+5)<renderDensity(ratio)*.32){
+      const points=[[-240,735],[35,705],[270,679],[490,656],[705,652],[850,678],[1080,724],[1520,840]].map((p,i)=>{
+        const x=p[0]+(i===0||i===7?0:(random(id+i*17)-.5)*30),edge=x<550?704-x*.10:x<745?649:649+(x-745)*.21;
+        return[x,Math.max(edge+3,p[1])+random(id+i*23)*14];
+      });
+      if(random(id+3)>.5)points.reverse();
+      const route=navigate(path(points)),speed=walkingSpeed(id);
+      result={...appearance(id),birth,route,speed,duration:route.length/(speed*.8),kind:'walk',area:'rear'};
+    }
+    trips.set(cacheKey,result);if(trips.size>8000)trips.delete(trips.keys().next().value);return result;
+  }
   function visit(cycle,seat){
     const chair=seats[seat],table=tables[chair.tableId],id=1000000000+cycle*32+seat,birth=cycle*430-seat*41;
     if(random(id+33)>.10+.84*trafficAt(CityCalendar.parts(birth*60000).hour).ratio)return null;
@@ -112,7 +128,7 @@
     for(let tick=seed?1:0;tick<=(BLOCK+start-begin)/STEP;tick++){
       const t=begin+tick*STEP;
       const comfort=1.08;
-      while((slot+1)*SLOT<=t){slot++;queue(trip(slot))}
+      while((slot+1)*SLOT<=t){slot++;queue(trip(slot));queue(rearTrip(slot))}
       visits.forEach((cycle,seat)=>{while((visits[seat]+1)*430-seat*41<=t){visits[seat]++;queue(visit(visits[seat],seat))}});
       for(let i=pending.length-1;i>=0;i--){const spec=pending[i],p=spec.route.p[0];if(agents.some(a=>distance(a.pos,p)<a.radius+spec.radius+.08))continue;agents.push({...spec,definition:spec,pos:[...p],vx:0,vz:0,waypoint:1,travelled:0,heading:Math.atan2(spec.route.p[1][0]-p[0],p[1]-spec.route.p[1][1]),locomotion:0,sitting:0,departing:false,entered:false});pending.splice(i,1)}
       // Rotate priority so one walker does not always win a crossing.
@@ -239,5 +255,5 @@
     ...tables.map(t=>({y:t.y,paint:g=>{paintTable(g,t);if(weather&&root.CityWeather)root.CityWeather.paintFurnitureSnow(g,t,weather,light)}})),
     ...seats.map(c=>({y:c.y+(c.facing[1]>.1?1:-1),paint:g=>paintChair(g,c)}))
   ]}
-  root.CityLife={weights,daily,trafficAt,peopleAt,paintWalker,paintTable,paintChairs,paintChair,furnitureLayers,tables,seats,tableScale,project,unproject,trip,SLOT,MAX_TRIP,legPose,body,densityMultiplier,renderDensity,obstacles,STEP,BLOCK};if(typeof module!=='undefined')module.exports=root.CityLife;
+  root.CityLife={weights,daily,trafficAt,peopleAt,paintWalker,paintTable,paintChairs,paintChair,furnitureLayers,tables,seats,tableScale,project,unproject,trip,rearTrip,SLOT,MAX_TRIP,legPose,body,densityMultiplier,renderDensity,obstacles,STEP,BLOCK};if(typeof module!=='undefined')module.exports=root.CityLife;
 })(typeof window==='undefined'?globalThis:window);

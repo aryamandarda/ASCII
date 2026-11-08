@@ -28,3 +28,20 @@ for(let y=0;y<854;y++)for(let x=0;x<1280;x++){const i=(y*1280+x)*4,v=150+60*Math
 const center=(780*1280+400)*4,sky=plate.data[0];E.neutralizePavement(plate);
 assert(plate.data[center]<175,'Baked photographic bright patch is suppressed');
 assert.equal(plate.data[0],sky,'Facade and sky are untouched');
+// A sharp highlight used to survive the broad normalization at its perimeter.
+const hardPlate={data:new Uint8ClampedArray(1280*854*4)};
+for(let y=0;y<854;y++)for(let x=0;x<1280;x++){const i=(y*1280+x)*4,v=x>=350&&x<450&&y>=750&&y<800?220:150;hardPlate.data[i]=v;hardPlate.data[i+1]=v;hardPlate.data[i+2]=v;hardPlate.data[i+3]=255;}
+E.neutralizePavement(hardPlate);
+for(let y=745;y<805;y++)for(let x=345;x<455;x++)assert(hardPlate.data[(y*1280+x)*4]<171,'Bright patch edges must disappear too');
+assert.equal(E.reflectionAxis({position:[0,8,24]}),660,'Reflection axis follows the projected ground beneath a screen');
+// Wet reflections use the live screen stage during day and night, and cache
+// geometry only until the screen frame changes. Dry pavement draws none.
+let screenDraws=0,composites=0;
+const fake={save(){},restore(){},clearRect(){},scale(){},translate(){},beginPath(){},moveTo(){},lineTo(){},closePath(){},clip(){},drawImage(){composites++}};
+const previousDocument=global.document;global.document={createElement(){return {getContext(){return fake}}}};
+const screens=[{light:{position:[0,8,24],power:.8},cacheKey:'frame1'}],draw=()=>screenDraws++;
+E.paintWetScreens(fake,{night:0},screens,0,draw);assert.equal(screenDraws,0);assert.equal(composites,0);
+E.paintWetScreens(fake,{night:0},screens,.85,draw);assert.equal(screenDraws,1);assert(composites>0,'Daytime rain still reflects screens');
+E.paintWetScreens(fake,{night:1},screens,.85,draw);assert.equal(screenDraws,1);
+screens[0].cacheKey='frame2';E.paintWetScreens(fake,{night:1},screens,.85,draw);assert.equal(screenDraws,2,'Reflection tracks the animated advertisement');
+global.document=previousDocument;

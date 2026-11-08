@@ -109,7 +109,7 @@
   }
   let groundCanvas,groundCtx,groundPixels;
   function paintSurfaces(g,w,l){
-    if(w.wetness>.01){g.save();g.beginPath();g.moveTo(0,704);g.lineTo(550,649);g.lineTo(745,649);g.lineTo(1280,762);g.lineTo(1280,H);g.lineTo(0,H);g.closePath();g.clip();g.globalAlpha=w.wetness*.17;g.fillStyle='#172331';g.fillRect(0,640,W,H-640);g.restore()}
+    if(w.wetness>.01){g.save();g.beginPath();g.moveTo(0,704);g.lineTo(550,649);g.lineTo(745,649);g.lineTo(1280,762);g.lineTo(1280,H);g.lineTo(0,H);g.closePath();g.clip();g.globalAlpha=w.wetness*.25;g.fillStyle='#172331';g.fillRect(0,640,W,H-640);g.restore()}
     if(w.groundSnow>.01){
       if(!groundCanvas){groundCanvas=document.createElement('canvas');groundCanvas.width=320;groundCanvas.height=54;groundCtx=groundCanvas.getContext('2d');groundPixels=groundCtx.createImageData(320,54)}
       const data=groundPixels.data;for(let y=0;y<54;y++)for(let x=0;x<320;x++){const X=(x+.5)*4,Y=638+(y+.5)*4,i=(y*320+x)*4,a=snowCoverage(X,Y,w.groundSnow),grain=.93+.07*noise(X/7,Y/5);
