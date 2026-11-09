@@ -4,7 +4,10 @@
   const daily=220000,total=weights.reduce((a,b)=>a+b,0),peak=Math.max(...weights);
   const coats=['#28adb9','#bd4a74','#ce8c4d','#5d81a8','#748360','#ad6060','#d1bb86','#495368','#8c79a4','#afb9b1'],skins=['#e8ba93','#a46d4b','#70452f','#d4976d','#c88457'];
   const random=n=>{const v=Math.sin(n*127.1+19.7)*43758.5453;return v-Math.floor(v)},mod=(n,m)=>((n%m)+m)%m,smooth=v=>{v=Math.max(0,Math.min(1,v));return v*v*(3-2*v)};
-  const clamp=(n,a,b)=>Math.max(a,Math.min(b,n)),distance=(a,b)=>Math.hypot(a[0]-b[0],a[1]-b[1]);
+  // World coordinates are bounded: a direct 2D length avoids the generalized
+  // hypot path in the millions of crowd collision checks.
+  const length2=(x,z)=>Math.sqrt(x*x+z*z);
+  const clamp=(n,a,b)=>Math.max(a,Math.min(b,n)),distance=(a,b)=>length2(a[0]-b[0],a[1]-b[1]);
   const routes=[
     [[-240,735],[420,690],[680,690],[950,752],[1520,870]],
     [[-240,782],[230,733],[515,726],[850,742],[1060,760],[1520,845]],
@@ -78,7 +81,7 @@
     return{...appearance(id),birth,route,duration:route.length/.65,kind:'visit',seat,tableId:table.id,sitFacing:chair.facing,dwell:120+random(id+20)*65};
   }
   function inPlaza(p){const q=project(p);if(q.x<735||q.x>1500)return true;return q.y-q.h*.06>642+(q.x-735)*148/765+2}
-  function segmentDistance(a,b,p){const dx=b[0]-a[0],dz=b[1]-a[1],d=dx*dx+dz*dz,t=d?clamp(((p[0]-a[0])*dx+(p[1]-a[1])*dz)/d,0,1):0;return Math.hypot(a[0]+dx*t-p[0],a[1]+dz*t-p[1])}
+  function segmentDistance(a,b,p){const dx=b[0]-a[0],dz=b[1]-a[1],d=dx*dx+dz*dz,t=d?clamp(((p[0]-a[0])*dx+(p[1]-a[1])*dz)/d,0,1):0;return length2(a[0]+dx*t-p[0],a[1]+dz*t-p[1])}
   // Static visibility graph routes around furniture before local crowd avoidance.
   const navigation=new Map();
   function navigate(route,ownTable){
@@ -165,14 +168,14 @@
         const fx=(target[0]-a.pos[0])/gap,fz=(target[1]-a.pos[1])/gap;
         const pace=.91+.05*Math.sin(t/a.paceInterval*Math.PI*2+a.phase),weave=Math.sin(t/(a.paceInterval*.73)+a.phase)*.045;
         let vx=(fx-fz*weave)*a.speed*pace,vz=(fz+fx*weave)*a.speed*pace;
-        const neighbors=agents.filter(b=>b!==a&&!b.done&&distance(a.pos,b.pos)<2.2);
+        const neighbors=agents.filter(b=>b!==a&&!b.done&&Math.abs(a.pos[0]-b.pos[0])<2.2&&Math.abs(a.pos[1]-b.pos[1])<2.2&&distance(a.pos,b.pos)<2.2);
         for(const b of neighbors){
-          const nx=a.pos[0]+a.vx*.85-b.pos[0]-b.vx*.85,nz=a.pos[1]+a.vz*.85-b.pos[1]-b.vz*.85,d=Math.hypot(nx,nz),push=Math.max(0,comfort-d)*.65;
+          const nx=a.pos[0]+a.vx*.85-b.pos[0]-b.vx*.85,nz=a.pos[1]+a.vz*.85-b.pos[1]-b.vz*.85,d=length2(nx,nz),push=Math.max(0,comfort-d)*.65;
           if(d>.001){vx+=nx/d*push;vz+=nz/d*push}
           if(push>.12){vx-=fz*.15;vz+=fx*.15}
         }
-        for(const o of obstacles){if(o.id===a.tableId)continue;const nx=a.pos[0]-o.p[0],nz=a.pos[1]-o.p[1],d=Math.hypot(nx,nz),push=Math.max(0,o.radius+a.radius+.5-d)*.85;if(d>0){vx+=nx/d*push;vz+=nz/d*push}}
-        const magnitude=Math.hypot(vx,vz),limit=a.speed*(1-.45*a.sitting);if(magnitude>limit){vx*=limit/magnitude;vz*=limit/magnitude}
+        for(const o of obstacles){if(o.id===a.tableId)continue;const nx=a.pos[0]-o.p[0],nz=a.pos[1]-o.p[1],d=length2(nx,nz),push=Math.max(0,o.radius+a.radius+.5-d)*.85;if(d>0){vx+=nx/d*push;vz+=nz/d*push}}
+        const magnitude=length2(vx,vz),limit=a.speed*(1-.45*a.sitting);if(magnitude>limit){vx*=limit/magnitude;vz*=limit/magnitude}
         const clear=p=>inPlaza(p)&&neighbors.every(b=>segmentDistance(a.pos,p,b.pos)>=a.radius+b.radius+.025)&&obstacles.every(o=>o.id===a.tableId||segmentDistance(a.pos,p,o.p)>=o.radius+a.radius);
         let chosen=null,best=-Infinity;
         const preferred=[vx,vz],walking=a.speed*pace*(1-.45*a.sitting);
@@ -182,19 +185,19 @@
         for(const [cx,cz] of candidates){
           const dx=cx*STEP,dz=cz*STEP,p=[a.pos[0]+dx,a.pos[1]+dz];
           if(!clear(p))continue;
-          let score=(cx*fx+cz*fz)*.7-(Math.hypot(cx-vx,cz-vz))*.18;
+          let score=(cx*fx+cz*fz)*.7-(length2(cx-vx,cz-vz))*.18;
           for(const b of neighbors){
-            const d=Math.hypot(p[0]+cx*.7-b.pos[0]-b.vx*.7,p[1]+cz*.7-b.pos[1]-b.vz*.7);
+            const d=length2(p[0]+cx*.7-b.pos[0]-b.vx*.7,p[1]+cz*.7-b.pos[1]-b.vz*.7);
             score-=Math.max(0,a.radius+b.radius+.25-d)*.9;
           }
           // Keep a slight, consistent side preference when two walkers meet.
           score+=(cz*fx-cx*fz)*.028;
           if(score>best){best=score;chosen=p}
         }
-        if(chosen){const dx=chosen[0]-a.pos[0],dz=chosen[1]-a.pos[1];a.travelled+=Math.hypot(dx,dz);a.pos=chosen;a.vx=dx/STEP;a.vz=dz/STEP}else{a.vx=a.vz=0}
+        if(chosen){const dx=chosen[0]-a.pos[0],dz=chosen[1]-a.pos[1];a.travelled+=length2(dx,dz);a.pos=chosen;a.vx=dx/STEP;a.vz=dz/STEP}else{a.vx=a.vz=0}
       }
       for(const a of agents){
-        const velocity=Math.hypot(a.vx,a.vz),facing=a.sitting>.5?a.sitFacing:null;
+        const velocity=length2(a.vx,a.vz),facing=a.sitting>.5?a.sitFacing:null;
         if(facing||velocity>.06){const target=facing?Math.atan2(facing[0],-facing[1]):Math.atan2(a.vx,-a.vz);a.heading=Rig.turnTowards(a.heading,target,STEP)}
         a.locomotion+=(Math.min(1,velocity/.35)*(1-a.sitting)-a.locomotion)*(1-Math.exp(-STEP/.42));
       }
