@@ -5,7 +5,7 @@
   "description": "Interactive city portraits rendered in characters",
   "scripts": {
     "test": "node --test tests/*.test.cjs",
-    "judge:gait": "node scripts/gait/judge.cjs dist/projects/ASCII/nyc/pedestrian-rig.js dist/gait-study/current-report.json",
+    "judge:gait": "node tools/gait/judge.cjs web/artworks/nyc/pedestrian-rig.js web/gait-study/current-report.json",
     "test:worker": "vitest run",
     "dev:worker": "wrangler dev"
   },

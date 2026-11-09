@@ -1,5 +1,5 @@
 const assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs'),path=require('node:path');
-const dir=path.resolve('dist/projects/ASCII/nyc');let reply;
+const dir=path.resolve('web/artworks/nyc');let reply;
 const sandbox={postMessage:data=>reply=data};const context=vm.createContext(sandbox);
 sandbox.importScripts=(...files)=>files.forEach(file=>vm.runInContext(fs.readFileSync(path.join(dir,file),'utf8'),context,{filename:file}));
 vm.runInContext(fs.readFileSync(path.join(dir,'crowd-worker.js'),'utf8'),context);

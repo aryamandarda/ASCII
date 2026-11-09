@@ -1,5 +1,5 @@
 const assert=require('node:assert/strict');
-const R=require('../dist/projects/ASCII/nyc/pedestrian-rig.js');
+const R=require('../web/artworks/nyc/pedestrian-rig.js');
 const distance=(a,b)=>Math.hypot(...a.map((v,i)=>v-b[i]));
 const kneeAngle=l=>180-Math.acos(Math.max(-1,Math.min(1,l.hip.map((v,i)=>v-l.knee[i]).reduce((s,v,i)=>s+v*(l.ankle[i]-l.knee[i]),0)/(R.body.thigh*R.body.shank))))*180/Math.PI;
 let peak=0;

@@ -1,5 +1,5 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
-const model=require('../dist/projects/ASCII/nyc/billboard-model.js'),director=require('../dist/projects/ASCII/nyc/ad-director.js'),grid=require('../dist/projects/ASCII/nyc/character-grid.js'),life=require('../dist/projects/ASCII/nyc/city-life.js');
+const model=require('../web/artworks/nyc/billboard-model.js'),director=require('../web/artworks/nyc/ad-director.js'),grid=require('../web/artworks/nyc/character-grid.js'),life=require('../web/artworks/nyc/city-life.js');
 assert.equal(director.names.length,10);
 for(const t of [0,10,21,31,41,61,65,128])assert.equal(new Set(director.mainScreens.map(i=>director.adAt(i,t).ad)).size,10);
 for(const [g,start]of [[0,12],[1,32],[2,52]]) {
@@ -9,23 +9,26 @@ for(const [g,start]of [[0,12],[1,32],[2,52]]) {
 const flowSum=Array.from({length:24},(_,h)=>life.trafficAt(h).flow).reduce((a,b)=>a+b,0);
 assert(Math.abs(flowSum-220000)<24,'Estimated hourly flow must sum to the published daily anchor');
 assert(life.trafficAt(17).count>life.trafficAt(4).count*10);assert(life.trafficAt(12).count>life.trafficAt(10).count);
-global.SunCalc=require('../dist/projects/ASCII/nyc/vendor/suncalc.js');global.CityCalendar=require('../dist/projects/ASCII/nyc/calendar.js');global.BillboardModel=model;const traffic=require('../dist/projects/ASCII/nyc/traffic.js');
+global.SunCalc=require('../web/artworks/nyc/vendor/suncalc.js');global.CityCalendar=require('../web/artworks/nyc/calendar.js');global.BillboardModel=model;const traffic=require('../web/artworks/nyc/traffic.js');
 // Integration: fresh page advances on its own, no video autoplay or user gesture.
 const canvases=[],images=[],listeners={};let nextFrame,resizeCallback;
 class Context {constructor(){this.draws=[];this.uploads=[]}createImageData(w,h){return{data:new Uint8ClampedArray(w*h*4)}}putImageData(...args){this.uploads.push(args)}drawImage(...a){this.draws.push(a)}getImageData(x,y,w,h){return{data:new Uint8ClampedArray(w*h*4).fill(160)}}clearRect(){}fillRect(){}fillText(){}beginPath(){}lineTo(){}moveTo(){}closePath(){}save(){}restore(){}clip(){}transform(){}setTransform(){}fill(){}stroke(){}ellipse(){}translate(){}scale(){}createLinearGradient(){return{addColorStop(){}}}createRadialGradient(){return{addColorStop(){}}}}
 function canvas(){const c={dataset:{},style:{setProperty(){}},width:0,height:0,context:new Context(),getContext(){return this.context}};canvases.push(c);return c}
 class ImageMock {constructor(){this.naturalWidth=240;this.naturalHeight=360;images.push(this)}}
 const elements={art:canvas(),ambient:canvas()};function element(id){return elements[id]||(elements[id]={style:{setProperty(){}},attributes:{},clientWidth:390,clientHeight:844,setAttribute(k,v){this.attributes[k]=v},removeAttribute(){},focus(){}})}
-const win={};vm.runInNewContext(fs.readFileSync('dist/projects/ASCII/nyc/motion-manifest.js','utf8'),{window:win});
-const weather=require('../dist/projects/ASCII/nyc/weather.js'),environment=require('../dist/projects/ASCII/nyc/environment.js');
-const sandbox={CityWeather:{...weather,paintSurfaces(){},paintPrecipitation(){},paintFurnitureSnow(){}},BillboardModel:model,AdDirector:director,CharacterGrid:grid,CityLife:life,CityTraffic:traffic,CityCalendar,Intl,Date,MotionManifest:win.MotionManifest,CityEnvironment:{...environment,setPalette(){},palettes:{},paintBillboardGlow(){},billboardExposure:()=>.85,create(){return{render:hour=>({hour}),skyPixels:170000}}},Image:ImageMock,
+const win={};vm.runInNewContext(fs.readFileSync('web/artworks/nyc/motion-manifest.js','utf8'),{window:win});
+const weather=require('../web/artworks/nyc/weather.js'),environment=require('../web/artworks/nyc/environment.js');
+let crowdReady=false;
+const sandbox={CityCrowd:{create:()=>({isReady:()=>crowdReady,peopleAt:t=>crowdReady?life.peopleAt(t):[],mode:()=>"test"})},CityWeather:{...weather,paintSurfaces(){},paintPrecipitation(){},paintFurnitureSnow(){}},BillboardModel:model,AdDirector:director,CharacterGrid:grid,CityLife:life,CityTraffic:traffic,CityCalendar,Intl,Date,MotionManifest:win.MotionManifest,CityEnvironment:{...environment,setPalette(){},palettes:{},paintBillboardGlow(){},billboardExposure:()=>.85,create(){return{render:hour=>({hour}),skyPixels:170000}}},Image:ImageMock,
  document:{hidden:false,querySelectorAll(){return[]},getElementById:element,addEventListener(name,fn){listeners[name]=fn},createElement(tag){assert.equal(tag,'canvas','No hidden autoplay video dependency');return canvas()}},
  ResizeObserver:class{constructor(fn){resizeCallback=fn}observe(){}},
  matchMedia:()=>({matches:false}),performance:{now:()=>0},requestAnimationFrame(fn){nextFrame=fn},setTimeout(fn){fn()},clearTimeout(){}};
 (async()=>{
- vm.runInNewContext(fs.readFileSync('dist/projects/ASCII/nyc/fixed-screens.js','utf8'),sandbox);
+ vm.runInNewContext(fs.readFileSync('web/artworks/nyc/fixed-screens.js','utf8'),sandbox);
  images.forEach(i=>i.onload());await new Promise(resolve=>setImmediate(resolve));
  assert(nextFrame,'Fresh load must start the animation loop');
+ assert.equal(elements.art.context.uploads.length,0,'Do not reveal the background while the initial crowd is pending');
+ crowdReady=true;
  nextFrame(1000);nextFrame(1180);const first=elements.art.dataset.motionFrames;nextFrame(1360);
  assert.notEqual(elements.art.dataset.motionFrames,first,'Campaign frames advance without a pause/play click');
  assert(+elements.art.dataset.simulationTime>0,'Walkers and ads share an advancing clock');
@@ -39,8 +42,8 @@ const sandbox={CityWeather:{...weather,paintSurfaces(){},paintPrecipitation(){},
  vm.runInNewContext(`ms.getImageData=()=>({data:new Uint8ClampedArray(cols*rows*4)});asciiPass()`,sandbox);
  assert(out.context.uploads.at(-1)[0].data.every(v=>v===160),'Vacated cells restore scene atlas even with unchanged RGB');
  assert.equal(sample.context.draws[0][0],world);assert.deepEqual(sample.context.draws[0].slice(1),[0,0,columns,rows]);assert(world.context.draws.length>model.boards.length);
- const html=fs.readFileSync('dist/projects/ASCII/nyc/index.html','utf8');assert(!html.includes('id="density"'),'The density slider is removed');
- elements.time.value='240';elements.time.oninput();const quiet=+out.dataset.people;elements.time.value='1020';elements.time.oninput();assert(+out.dataset.people>quiet*3);
+ const html=fs.readFileSync('web/artworks/nyc/index.html','utf8');assert(!html.includes('id="density"'),'The density slider is removed');
+ const completedFrame=out.dataset.frame;crowdReady=false;elements.time.value='240';elements.time.oninput();assert.equal(out.dataset.frame,completedFrame,'A date/time seek holds the last complete scene while the crowd loads');crowdReady=true;elements.time.oninput();const quiet=+out.dataset.people;elements.time.value='1020';elements.time.oninput();assert(+out.dataset.people>quiet*3);
  elements.play.onclick();const paused=out.dataset.simulationTime;nextFrame(1540);nextFrame(1720);assert.equal(out.dataset.simulationTime,paused);
  elements.play.onclick();nextFrame(1900);nextFrame(2080);assert(+out.dataset.simulationTime>+paused);
  elements.reverse.onclick();const epoch=+out.dataset.epoch;nextFrame(2260);assert(+out.dataset.epoch<epoch);

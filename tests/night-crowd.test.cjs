@@ -1,7 +1,7 @@
 const assert=require('node:assert/strict');
-global.SunCalc=require('../dist/projects/ASCII/nyc/vendor/suncalc.js');
-global.CityCalendar=require('../dist/projects/ASCII/nyc/calendar.js');
-const L=require('../dist/projects/ASCII/nyc/city-life.js'),E=require('../dist/projects/ASCII/nyc/environment.js');
+global.SunCalc=require('../web/artworks/nyc/vendor/suncalc.js');
+global.CityCalendar=require('../web/artworks/nyc/calendar.js');
+const L=require('../web/artworks/nyc/city-life.js'),E=require('../web/artworks/nyc/environment.js');
 // Reproduce the left-table trap, then cover randomized waypoints near both tables.
 for(let slot=33223000;slot<33225000;slot++){
  const trip=L.trip(slot);if(!trip)continue;

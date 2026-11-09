@@ -1,6 +1,6 @@
 const assert=require('node:assert/strict');
-global.SunCalc=require('../dist/projects/ASCII/nyc/vendor/suncalc.js');global.CityCalendar=require('../dist/projects/ASCII/nyc/calendar.js');
-const W=require('../dist/projects/ASCII/nyc/weather.js'),E=require('../dist/projects/ASCII/nyc/environment.js'),C=CityCalendar,H=3600000;
+global.SunCalc=require('../web/artworks/nyc/vendor/suncalc.js');global.CityCalendar=require('../web/artworks/nyc/calendar.js');
+const W=require('../web/artworks/nyc/weather.js'),E=require('../web/artworks/nyc/environment.js'),C=CityCalendar,H=3600000;
 const at=(date,hour=12)=>W.weatherAt(C.localEpoch(date,hour*60));
 assert(at('2026-01-02').snow>.1);assert(at('2026-01-02').groundSnow>3);
 assert.equal(at('2026-01-03').snow,0);assert(at('2026-01-03').groundSnow>5,'Snow persists after the storm');

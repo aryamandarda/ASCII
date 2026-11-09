@@ -1,7 +1,7 @@
 const assert=require('node:assert/strict');
-global.SunCalc=require('../dist/projects/ASCII/nyc/vendor/suncalc.js');
-global.CityCalendar=require('../dist/projects/ASCII/nyc/calendar.js');
-const L=require('../dist/projects/ASCII/nyc/city-life.js'),C=CityCalendar;
+global.SunCalc=require('../web/artworks/nyc/vendor/suncalc.js');
+global.CityCalendar=require('../web/artworks/nyc/calendar.js');
+const L=require('../web/artworks/nyc/city-life.js'),C=CityCalendar;
 const start=C.localEpoch('2026-11-07',1080)/60000;
 let moving=0,near=0;const styles=new Set(),intervals=new Set(),speeds=new Set();
 for(let dt=0;dt<=180;dt+=.125){

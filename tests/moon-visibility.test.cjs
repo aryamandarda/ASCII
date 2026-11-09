@@ -1,7 +1,7 @@
 const assert=require('node:assert/strict'),{execFileSync}=require('node:child_process');
-global.SunCalc=require('../dist/projects/ASCII/nyc/vendor/suncalc.js');
-const C=require('../dist/projects/ASCII/nyc/calendar.js'),E=require('../dist/projects/ASCII/nyc/environment.js');
-const pixels=execFileSync('ffmpeg',['-v','error','-i','dist/projects/ASCII/nyc/times-square-empty-day.jpg','-f','rawvideo','-pix_fmt','rgb24','-'],{maxBuffer:8e6});
+global.SunCalc=require('../web/artworks/nyc/vendor/suncalc.js');
+const C=require('../web/artworks/nyc/calendar.js'),E=require('../web/artworks/nyc/environment.js');
+const pixels=execFileSync('ffmpeg',['-v','error','-i','web/artworks/nyc/times-square-empty-day.jpg','-f','rawvideo','-pix_fmt','rgb24','-'],{maxBuffer:8e6});
 let visible=0;const phases=new Set();
 for(let day=1;day<=30;day++)for(let h=0;h<24;h++){
  const l=C.lightAt(C.localEpoch(`2026-11-${String(day).padStart(2,'0')}`,h*60));

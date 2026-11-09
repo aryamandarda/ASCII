@@ -33,12 +33,14 @@ test('artworks have independent state and concurrent distinct likes are not lost
  expect((await object.snapshot(ids[0])).count).toBe(0);
 });
 test('both entrypoints and artwork assets remain available',async()=>{
- for(const path of ['/','/projects/ASCII/nyc/']){const r=await exports.default.fetch('https://example.com'+path);expect(r.status).toBe(200);expect(await r.text()).toContain('id="likeCount"')}
- const js=await exports.default.fetch('https://example.com/projects/ASCII/nyc/likes.js');expect(js.status).toBe(200);expect(js.headers.get('content-type')).toContain('javascript');
+ for(const path of ['/','/artworks/nyc/']){const r=await exports.default.fetch('https://example.com'+path);expect(r.status).toBe(200);expect(await r.text()).toContain('id="likeCount"')}
+ const js=await exports.default.fetch('https://example.com/artworks/nyc/likes.js');expect(js.status).toBe(200);expect(js.headers.get('content-type')).toContain('javascript');
 });
 
  test('personal-site subpath preserves artwork URLs and keeps likes inside the route',async()=>{
  const base='https://example.com/ascii-art/nyc';
+ const legacy=await exports.default.fetch('https://example.com/projects/ASCII/nyc/',{redirect:'manual'});
+ expect(legacy.status).toBe(308);expect(legacy.headers.get('location')).toBe(base+'/');
  const redirect=await exports.default.fetch(base,{redirect:'manual'});
  expect(redirect.status).toBe(308);expect(redirect.headers.get('location')).toBe(base+'/');
  const page=await exports.default.fetch(base+'/');expect(page.status).toBe(200);

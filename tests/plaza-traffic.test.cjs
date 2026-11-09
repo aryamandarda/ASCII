@@ -1,6 +1,6 @@
 const assert=require('node:assert/strict');
-global.SunCalc=require('../dist/projects/ASCII/nyc/vendor/suncalc.js');global.CityCalendar=require('../dist/projects/ASCII/nyc/calendar.js');global.BillboardModel=require('../dist/projects/ASCII/nyc/billboard-model.js');
-const C=CityCalendar,B=BillboardModel,T=require('../dist/projects/ASCII/nyc/traffic.js'),L=require('../dist/projects/ASCII/nyc/city-life.js'),E=require('../dist/projects/ASCII/nyc/environment.js');
+global.SunCalc=require('../web/artworks/nyc/vendor/suncalc.js');global.CityCalendar=require('../web/artworks/nyc/calendar.js');global.BillboardModel=require('../web/artworks/nyc/billboard-model.js');
+const C=CityCalendar,B=BillboardModel,T=require('../web/artworks/nyc/traffic.js'),L=require('../web/artworks/nyc/city-life.js'),E=require('../web/artworks/nyc/environment.js');
 // The knee should stay between hip and ankle vertically; left/right legs never invert.
 for(let phase=0;phase<Math.PI*2;phase+=.03)for(const dir of [-1,1]){const a=L.legPose(phase,-1,dir),b=L.legPose(phase,1,dir);assert(a.ankle[0]<b.ankle[0]);assert(a.knee[0]<b.knee[0]);for(const leg of [a,b])assert(leg.hip[1]<leg.knee[1]&&leg.knee[1]<leg.ankle[1])}
 let stopped=false,moving=false,lanes=new Set(),lamps=new Set();const base=C.localEpoch('2026-11-07',1020)/60000;

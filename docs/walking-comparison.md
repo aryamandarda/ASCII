@@ -24,7 +24,7 @@ Keep translation, crowd routing and the common character grid. Compare one contr
 
 ## Revised candidate
 
-The original renderer is preserved as `dist/gait-study/baseline-rig.js`; the checkbox switches both engine panels at the same phase. The scene now uses the revised rig on the review branch. The character grid is unchanged.
+The original renderer is preserved as `web/gait-study/baseline-rig.js`; the checkbox switches both engine panels at the same phase. The scene now uses the revised rig on the review branch. The character grid is unchanged.
 
 Pelvis height follows a low-amplitude trajectory with a leg-reach constraint rather than maximizing support-leg extension. The torso connects that pelvis to a stabilized shoulder frame; the head remains attached to it. Shoulder/pelvis twist oppose one another, with a small varying forward inclination. Swing clearance is reduced while preserving heel/toe contact. Thicker legs, connected visible shoes, and a continuous profile contour improve the silhouette. At the 1.18 m test stride, sampled head excursion drops from 5.91 cm to 0.37 cm and pelvis excursion to 1.33 cm. These are engine measurements, not measurements extracted from the reference.
 

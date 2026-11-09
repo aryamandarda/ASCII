@@ -1,5 +1,5 @@
 const assert=require('node:assert/strict');
-const W=require('../dist/projects/ASCII/nyc/weather.js');
+const W=require('../web/artworks/nyc/weather.js');
 for(const x of [-8,0,8]){
  const a=W.projectWeatherPoint(x,6,20),b=W.projectWeatherPoint(x,5,20);
  assert(b.y>a.y,'World gravity travels down the image');
@@ -15,7 +15,7 @@ for(const kind of ['rain','snow'])for(let i=0;i<360;i++){
 }
 const wet=W.integrate({ground:0,roof:0,wet:.8},{temperature:15,sun:1,cloud:0,rain:0,snow:0},6);
 assert(wet.wet<.8&&wet.wet>0,'Pavement dries progressively');
-const E=require('../dist/projects/ASCII/nyc/environment.js');
+const E=require('../web/artworks/nyc/environment.js');
 const lamps=[{position:[0,8,24],normal:[0,0,-1],area:60,color:[255,80,40],power:1,radiance:[1,.2,.05]}];
 assert.deepEqual(E.wetReflectionAt(640,750,0,lamps),[0,0,0,0]);
 assert.deepEqual(E.wetReflectionAt(640,300,1,lamps),[0,0,0,0]);

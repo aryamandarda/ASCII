@@ -1,6 +1,6 @@
 const assert=require('node:assert/strict');
-global.SunCalc=require('../dist/projects/ASCII/nyc/vendor/suncalc.js');global.CityCalendar=require('../dist/projects/ASCII/nyc/calendar.js');
-const C=CityCalendar,L=require('../dist/projects/ASCII/nyc/city-life.js');
+global.SunCalc=require('../web/artworks/nyc/vendor/suncalc.js');global.CityCalendar=require('../web/artworks/nyc/calendar.js');
+const C=CityCalendar,L=require('../web/artworks/nyc/city-life.js');
 // Independent published New York fixtures: timeanddate.com, Nov 7 2026.
 const today=C.events('2026-11-07');assert(Math.abs(+today.sunrise-Date.parse('2026-11-07T11:33:00Z'))<60000);assert(Math.abs(+today.sunset-Date.parse('2026-11-07T21:45:00Z'))<60000);
 assert(+C.events('2027-06-21').sunset-+C.events('2027-06-21').sunrise>15*3600000);

@@ -11,7 +11,7 @@ aryamandarda.com/ascii-art/nyc
 aryamandarda.com/ascii-art/nyc/*
 ```
 
-The first redirects to the trailing slash. The second serves the scene, its assets, and `/ascii-art/nyc/api/likes`. Internally, artwork assets remain in `dist/projects/ASCII/nyc/`; the Worker rewrites the URL and HTML base path. Existing `/projects/ASCII/nyc/` asset paths and `/api/likes/nyc` remain compatible while the root is still hosted by this Worker.
+The first redirects to the trailing slash. The second serves the scene, its assets, and `/ascii-art/nyc/api/likes`. Internally, artwork assets remain in `web/artworks/nyc/`; the Worker rewrites the URL and HTML base path. Old `/projects/ASCII/nyc/` links redirect to the canonical artwork path. `/api/likes/nyc` remains compatible while the root is still hosted by this Worker.
 
 `workers_dev: false` and `preview_urls: false` disable the production Worker's alternative `workers.dev` addresses, including version previews. This setting belongs in source control so a later deployment does not re-enable them.
 
