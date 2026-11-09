@@ -39,3 +39,5 @@ npm run dev:worker
 Open the printed local address at `/ascii-art/nyc/`. Tests cover the trailing-slash redirect, HTML base path, asset serving, and the like endpoint, alongside counter behavior.
 
 The production Cloudflare build follows `main`. The deployment uses `wrangler.jsonc`, preserving the existing Durable Object binding and its stored reactions. The like counter is shared across the old and new paths; this change does not create a second counter.
+
+Artwork page and asset responses include `X-Artwork-Version`, taken from Cloudflare's version metadata binding. Compare it with the active deployment ID when checking a release; a successful build alone does not verify what a visitor receives.

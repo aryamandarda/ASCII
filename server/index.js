@@ -56,12 +56,14 @@ export default {
     if (url.pathname.startsWith(artworkPrefix + '/') && url.pathname !== artworkAPI) {
       const assetURL = new URL(url);
       assetURL.pathname = '/artworks/nyc/' + url.pathname.slice(artworkPrefix.length + 1);
-      const response = await env.ASSETS.fetch(new Request(assetURL, request));
+      let response = await env.ASSETS.fetch(new Request(assetURL, request));
       if (response.headers.get('Content-Type')?.includes('text/html')) {
-        return new HTMLRewriter().on('base', {
+        response = new HTMLRewriter().on('base', {
           element(element) { element.setAttribute('href', artworkPrefix + '/'); }
         }).transform(response);
       }
+      response = new Response(response.body, response);
+      response.headers.set('X-Artwork-Version', env.CF_VERSION_METADATA.id);
       return response;
     }
     if(url.pathname!=='/api/likes/nyc' && url.pathname!==artworkAPI) {

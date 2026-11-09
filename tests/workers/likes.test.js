@@ -44,6 +44,7 @@ test('both entrypoints and artwork assets remain available',async()=>{
  const redirect=await exports.default.fetch(base,{redirect:'manual'});
  expect(redirect.status).toBe(308);expect(redirect.headers.get('location')).toBe(base+'/');
  const page=await exports.default.fetch(base+'/');expect(page.status).toBe(200);
+ expect(page.headers.get('X-Artwork-Version')).toBe(env.CF_VERSION_METADATA.id);
  expect(await page.text()).toContain('<base href="/ascii-art/nyc/">');
  const script=await exports.default.fetch(base+'/renderer.js');expect(script.status).toBe(200);
  expect(script.headers.get('content-type')).toContain('javascript');
