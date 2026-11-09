@@ -16,7 +16,7 @@ xcrun clang -fobjc-arc -fmodules -Wall -Wextra -Werror -arch arm64 -arch x86_64 
   -o "$bundle/Contents/MacOS/TimesSquare"
 codesign --force --sign - "$bundle"
 codesign --verify --strict "$bundle"
-lipo -verify_arch arm64 x86_64 "$bundle/Contents/MacOS/TimesSquare"
+lipo "$bundle/Contents/MacOS/TimesSquare" -verify_arch arm64 x86_64
 cp macos/INSTALL.md "$output/INSTALL.md"
 cp THIRD_PARTY_NOTICES.md "$output/THIRD_PARTY_NOTICES.md"
 (cd "$output" && ditto -c -k --sequesterRsrc --keepParent 'Times Square.saver' Times-Square-Mac-screensaver.zip)
