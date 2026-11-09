@@ -1,9 +1,10 @@
-Offline Times Square screensaver for Apple Silicon and Intel Macs.
+Times Square for Mac 1.0.3 — the approved screensaver update.
 
-Version 1.0.2 suppresses WebKit's backing surface in the shipped wrapper, matching the native-frame test. The test now samples the composed screen saver view and rejects all-white as well as all-black output; it no longer changes the wrapper's visibility configuration.
+- Preserves clothing color and reduces horizontal striping in the character texture.
+- Displays the canvas directly, removing per-frame JPEG compression and decoding.
+- Fades in when artwork is ready and retains loaded artwork between activations.
+- Runs offline with natural seasonal weather and continuous 1× time progression.
 
-This preview renders live frames into a native Mac image view to avoid depending on WebKit's visible layer in the legacy screen saver host. It also adds picker thumbnails, bundled installation instructions, and readable loading failures. A 20-second native-frame smoke test runs with the web view invisible. Actual Tahoe screen saver host compatibility still needs confirmation; this is a workaround candidate.
+Includes Apple Silicon and Intel architectures; minimum deployment target macOS 12. Tested and approved in full-screen Preview on the maintainer’s Mac running macOS Tahoe. Other macOS versions and multiple displays have not been individually verified.
 
-Natural seasonal weather and continuous 1× time progression. No controls or like button. The scene starts at the current date and time on each activation, then advances one simulated minute per second.
-
-**Preview:** ad-hoc signed, not Apple-notarized. Minimum deployment target macOS 12. Native compilation and a WKWebView smoke test are automated; physical Mac Screen Saver host and multi-monitor testing are still needed. See [installation instructions](https://github.com/aryamandarda/ASCII/blob/main/macos/INSTALL.md).
+**Public preview:** ad-hoc signed, not Apple Developer ID signed or notarized. macOS may require approval in Privacy & Security. See the included INSTALL.md for installation and update instructions.

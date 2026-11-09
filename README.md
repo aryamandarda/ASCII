@@ -17,6 +17,12 @@ Built with vanilla JavaScript and Canvas 2D. No frontend framework or build step
 
 A heart button shows the shared like count. Tap to like or unlike. An anonymous browser cookie remembers your choice; clearing cookies or changing devices creates a new identity. Counts are reactions, not verified unique people.
 
+## Mac screensaver
+
+[Download Times Square for Mac](https://github.com/aryamandarda/ASCII/releases) — choose the newest release containing version 1.0.3. Includes Apple Silicon and Intel, offline animation, and natural seasonal weather.
+
+This is a public preview, not Apple-notarized. Read the [installation instructions](macos/INSTALL.md) before installing.
+
 ## Run locally
 
 ```sh

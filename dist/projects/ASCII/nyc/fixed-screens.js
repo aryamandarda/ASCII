@@ -9,10 +9,11 @@ const ag=atlas.getContext('2d');ag.font='bold 10px monospace';ag.textAlign='cent
 palette.forEach(([r,g,b],ci)=>{const gain=Math.min(1.16,255/Math.max(1,r,g,b));for(let j=0;j<8;j++){ag.fillStyle=`rgb(${r*.82},${g*.82},${b*.82})`;ag.fillRect(ci*6,j*10,6,10);ag.fillStyle=`rgb(${r*gain},${g*gain},${b*gain})`;ag.fillText(ramp[j],ci*6+3,j*10+5)}});
 
 const atlasPixels=new Uint32Array(ag.getImageData(0,0,atlas.width,atlas.height).data.buffer);
-// People use character ink with dark negative space instead of solid cell fills.
+// Keep clothing color under the character ink. Near-black inter-row gaps
+// turn into horizontal scanlines when the scene is reduced for video or preview.
 const humanAtlas=document.createElement('canvas');humanAtlas.width=atlas.width;humanAtlas.height=atlas.height;
 const hg=humanAtlas.getContext('2d');hg.font='bold 10px monospace';hg.textAlign='center';hg.textBaseline='middle';
-palette.forEach(([r,g,b],ci)=>{for(let j=0;j<8;j++){hg.fillStyle=`rgb(${r*.18},${g*.18},${b*.18})`;hg.fillRect(ci*6,j*10,6,10);hg.fillStyle=`rgb(${Math.min(255,r*1.45+20)},${Math.min(255,g*1.45+20)},${Math.min(255,b*1.45+20)})`;hg.fillText(' .:+x%#@'[Math.max(2,j)],ci*6+3,j*10+5)}});
+palette.forEach(([r,g,b],ci)=>{for(let j=0;j<8;j++){hg.fillStyle=`rgb(${r*.82},${g*.82},${b*.82})`;hg.fillRect(ci*6,j*10,6,10);hg.fillStyle=`rgb(${Math.min(255,r*1.16)},${Math.min(255,g*1.16)},${Math.min(255,b*1.16)})`;hg.fillText(' .:+x%#@'[Math.max(2,j)],ci*6+3,j*10+5)}});
 const humanPixels=new Uint32Array(hg.getImageData(0,0,humanAtlas.width,humanAtlas.height).data.buffer);
 const humanMask=document.createElement('canvas');humanMask.width=1280;humanMask.height=854;const hm=humanMask.getContext('2d');
 const maskSample=document.createElement('canvas'),ms=maskSample.getContext('2d',{willReadFrequently:true});

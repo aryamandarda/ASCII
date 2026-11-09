@@ -3,6 +3,7 @@
 #import <WebKit/WebKit.h>
 
 static BOOL done = NO;
+static BOOL observedColors = NO;
 static int result = 1;
 static int polls = 0;
 static double firstEpoch = 0;
@@ -20,16 +21,17 @@ static void poll(WKWebView *view) {
                 NSLog(@"FAIL configuration: %@", value); done = YES; return;
             }
             if (!firstEpoch) { firstEpoch = [value[@"epoch"] doubleValue]; firstObserved = CFAbsoluteTimeGetCurrent(); }
-            NSBitmapImageRep *pixels = [testedSaver bitmapImageRepForCachingDisplayInRect:testedSaver.bounds];
-            [testedSaver cacheDisplayInRect:testedSaver.bounds toBitmapImageRep:pixels];
-            BOOL colored = NO;
-            for (NSInteger y=0; y<pixels.pixelsHigh; y+=32) for (NSInteger x=0; x<pixels.pixelsWide; x+=32) {
-                NSColor *color = [[pixels colorAtX:x y:y] colorUsingColorSpace:NSColorSpace.deviceRGBColorSpace];
-                CGFloat high = MAX(color.redComponent, MAX(color.greenComponent, color.blueComponent));
-                CGFloat low = MIN(color.redComponent, MIN(color.greenComponent, color.blueComponent));
-                if (high - low > .15 && high > .3) colored = YES;
-            }
-            if (CFAbsoluteTimeGetCurrent() - firstObserved >= 20 && [value[@"epoch"] doubleValue] > firstEpoch + 30000 && [[testedSaver valueForKey:@"presentedFrames"] intValue] > 5 && colored) {
+            [view takeSnapshotWithConfiguration:nil completionHandler:^(NSImage *image, NSError *snapshotError) {
+                if (!image || snapshotError) return;
+                NSBitmapImageRep *pixels = [NSBitmapImageRep imageRepWithData:image.TIFFRepresentation];
+                for (NSInteger y=0; y<pixels.pixelsHigh; y+=32) for (NSInteger x=0; x<pixels.pixelsWide; x+=32) {
+                    NSColor *color = [[pixels colorAtX:x y:y] colorUsingColorSpace:NSColorSpace.deviceRGBColorSpace];
+                    CGFloat high = MAX(color.redComponent, MAX(color.greenComponent, color.blueComponent));
+                    CGFloat low = MIN(color.redComponent, MIN(color.greenComponent, color.blueComponent));
+                    if (high - low > .15 && high > .3) observedColors = YES;
+                }
+            }];
+            if (CFAbsoluteTimeGetCurrent() - firstObserved >= 20 && [value[@"epoch"] doubleValue] > firstEpoch + 30000 && [[testedSaver valueForKey:@"presentedFrames"] intValue] > 5 && view.alphaValue == 1 && observedColors) {
                 NSLog(@"PASS offline WebKit animation: %@", value); result = 0; done = YES; return;
             }
         }
@@ -43,6 +45,11 @@ int main(int argc, const char *argv[]) {
         [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
         [NSApp finishLaunching];
         NSBundle *bundle = [NSBundle bundleWithPath:[[NSString stringWithUTF8String:argv[1]] stringByStandardizingPath]];
+        NSError *loadError = nil;
+        if (![bundle loadAndReturnError:&loadError]) {
+            NSLog(@"FAIL loading saver bundle: %@", loadError);
+            return 1;
+        }
         Class principal = bundle.principalClass;
         if (!principal || ![principal isSubclassOfClass:ScreenSaverView.class]) { NSLog(@"FAIL loading saver bundle"); return 1; }
         NSRect frame = NSMakeRect(0,0,960,640);
@@ -55,9 +62,8 @@ int main(int argc, const char *argv[]) {
         [saver startAnimation];
         WKWebView *web = [saver valueForKey:@"webView"];
         if (!web) return 1;
-        // Model the failure mode: the visible output must not depend on WebKit's
-        // composited layer or its background requestAnimationFrame scheduler.
-        if (web.alphaValue != 0) { NSLog(@"FAIL: production WebKit surface is visible"); return 1; }
+        // The native timer drives animation even when WebKit reports a hidden page.
+        // The direct WebKit surface becomes visible only after its first complete frame.
         poll(web);
         NSDate *deadline = [NSDate dateWithTimeIntervalSinceNow:120];
         while (!done && deadline.timeIntervalSinceNow > 0) {
@@ -67,7 +73,7 @@ int main(int argc, const char *argv[]) {
             [saver animateOneFrame];
         }
         [saver stopAnimation];
-        if ([saver valueForKey:@"webView"] != nil) result = 1;
+        if ([saver valueForKey:@"webView"] != web) result = 1;
         [window orderOut:nil];
         if (!done) NSLog(@"FAIL WebKit startup/animation timed out");
         return result;
