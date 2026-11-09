@@ -1,7 +1,7 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs');
 function setup(fetch){
  const els=Object.fromEntries(['like','likeCount'].map(k=>[k,{textContent:'',attributes:{},setAttribute(k,v){this.attributes[k]=v},removeAttribute(k){delete this.attributes[k]}}]));
- vm.runInNewContext(fs.readFileSync('dist/projects/ASCII/nyc/likes.js','utf8'),{document:{getElementById:k=>els[k],addEventListener(){}},fetch,AbortSignal,Intl,Date});return els;
+ vm.runInNewContext(fs.readFileSync('dist/projects/ASCII/nyc/likes.js','utf8'),{document:{getElementById:k=>els[k],addEventListener(){}},location:{pathname:'/'},fetch,AbortSignal,Intl,Date});return els;
 }
 const tick=()=>new Promise(r=>setImmediate(r));
 test('network failure never invents a count; retry recovers',async()=>{let failed=true;const els=setup(async()=>{if(failed)throw Error();return {ok:true,json:async()=>({count:7,liked:false})}});await tick();assert.equal(els.likeCount.textContent,'');assert.equal(els.like.disabled,false);failed=false;await els.like.onclick();assert.equal(els.likeCount.textContent,'7')});

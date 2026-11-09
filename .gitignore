@@ -9,3 +9,4 @@ dist/review/
 .wrangler/
 
 build/
+work/

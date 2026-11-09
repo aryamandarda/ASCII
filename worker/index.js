@@ -42,7 +42,24 @@ async function readVote(request) {
 export default {
   async fetch(request, env) {
     const url=new URL(request.url);
-    if(url.pathname!=='/api/likes/nyc') {
+    const artworkPrefix = '/ascii-art/nyc';
+    const artworkAPI = artworkPrefix + '/api/likes';
+    if (url.pathname === artworkPrefix) {
+      url.pathname += '/';
+      return Response.redirect(url.toString(), 308);
+    }
+    if (url.pathname.startsWith(artworkPrefix + '/') && url.pathname !== artworkAPI) {
+      const assetURL = new URL(url);
+      assetURL.pathname = '/projects/ASCII/nyc/' + url.pathname.slice(artworkPrefix.length + 1);
+      const response = await env.ASSETS.fetch(new Request(assetURL, request));
+      if (response.headers.get('Content-Type')?.includes('text/html')) {
+        return new HTMLRewriter().on('base', {
+          element(element) { element.setAttribute('href', artworkPrefix + '/'); }
+        }).transform(response);
+      }
+      return response;
+    }
+    if(url.pathname!=='/api/likes/nyc' && url.pathname!==artworkAPI) {
       if(url.pathname.startsWith('/api/'))return json({error:'Not found'},404);
       return env.ASSETS.fetch(request);
     }

@@ -4,7 +4,7 @@ The artwork is static. Shared likes use the Worker in `worker/index.js` and one 
 
 For the complete app including persisted local likes, run `npm ci` and `npm run dev:worker`. Run `npm run test:worker` for Workers-runtime tests of concurrent likes, retry deduplication, unlike, cookie state, input rejection, and asset routing. `npm test` runs the existing artwork checks. Plain static/offline previews show an unavailable count and keep the artwork usable.
 
-The live endpoint is `/api/likes/nyc`. Only a random browser ID is stored with each active like; no IP address, name, or email is stored in the counter. Cookie expiry is one year. This is a lightweight reaction counter, not an identity or bot-verification system. Production data persists across code deployments.
+The public endpoint is `/ascii-art/nyc/api/likes`; `/api/likes/nyc` remains compatible. Only a random browser ID is stored with each active like; no IP address, name, or email is stored in the counter. Cookie expiry is one year. This is a lightweight reaction counter, not an identity or bot-verification system. Production data persists across code deployments.
 
 Serve `dist` with an HTTP server, for example:
 
@@ -44,13 +44,9 @@ The review uses the existing Workers Builds deployment method, with an explicit 
 
 Keep the temporary review site available until Aryaman explicitly says the review is finished and asks for deletion. At that point, remove its build trigger first and then delete only the `ascii-review` Worker. Keep the source branch and production site. A later review can recreate the same Worker name and URL.
 
-## Separate artwork and personal website repositories
+## Personal website integration
 
-Keep this repository as the source of the artwork. The personal website can include it at build time and copy only `dist/projects/ASCII` into its own static output at `projects/ASCII`.
-
-For example, pin this repository as a Git submodule under `vendor/ascii`, then copy `vendor/ascii/dist/projects/ASCII` into the website's public assets before building. This preserves `/projects/ASCII/nyc/` and keeps the personal homepage independent. Update the pinned artwork commit whenever a new version is ready.
-
-Alternatively, deploy this repository independently and route `/projects/ASCII/*` to that deployment using the personal site's Cloudflare Worker. Keep the remaining paths routed to the personal website.
+The canonical artwork path is `/ascii-art/nyc/`. Keep this repository and its Worker independent of the personal website; Cloudflare path routes preserve the artwork URL when the homepage launches. See [Hosting](docs/hosting.md) for the exact routes and migration steps.
 
 ## Cloudflare Pages
 

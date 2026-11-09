@@ -1,29 +1,43 @@
-# ASCII
+<div align="center">
 
-Interactive city portraits, rendered in characters.
+# Times Square
 
-## NYC
+**A living portrait of New York, rendered in characters.**
 
-Times Square as a living character canvas. Neon billboards trade places, the sky follows a New York calendar, and pedestrians and traffic move through a fixed street-level view.
+Light, weather, billboards, pedestrians, and traffic share one changing city clock.
 
-- Ten billboard creatives, animated campaigns, and coordinated screen takeovers.
-- Date-aware sunrise, sunset and moon phases, four twilight palettes, and individually lit windows.
-- Seasonal rain, drifting clouds, snowfall, and snow that accumulates and thaws across days.
-- Pedestrians with a proportioned skeleton, distance-driven gait, personal space, and time-of-day crowd density.
-- Red plaza seating and two-way traffic with headlights, brake lights, and reflections.
-- A minimal immersive view with glass controls, built for desktop and mobile.
+[**Explore the artwork ↗**](https://aryamandarda.com/ascii-art/nyc/) · [How it works](docs/rendering.md) · [Run locally](#run-locally) · [Mac preview](#mac-screensaver)
 
-Built with vanilla JavaScript and Canvas 2D. No frontend framework or build step. A small Cloudflare Worker and Durable Object persist anonymous likes; the artwork itself stays static.
+[![Times Square rendered as a full-color character canvas](docs/images/times-square.png)](https://aryamandarda.com/ascii-art/nyc/)
 
-A heart button shows the shared like count. Tap to like or unlike. An anonymous browser cookie remembers your choice; clearing cookies or changing devices creates a new identity. Counts are reactions, not verified unique people.
+*One fixed viewpoint. A city that keeps moving.*
 
-## Mac screensaver
+</div>
 
-[Download Times Square for Mac](https://github.com/aryamandarda/ASCII/releases) — choose the newest release containing version 1.0.3. Includes Apple Silicon and Intel, offline animation, and natural seasonal weather.
+## The scene
 
-This is a public preview, not Apple-notarized. Read the [installation instructions](macos/INSTALL.md) before installing.
+A photograph provides the architecture; a layered Canvas 2D simulation brings the street to life. The finished scene is sampled into a grid of colored characters on every rendered frame.
+
+- **A changing sky** — New York sunrise and sunset, moon phases, twilight palettes, and individually lit windows.
+- **Seasonal weather** — clouds, rain, snowfall, and ground snow that accumulates and thaws across days.
+- **A living plaza** — articulated pedestrians, personal space, seating, and time-of-day crowd density.
+- **Street traffic** — two-way movement, signals, headlights, brake lights, and reflections.
+- **Animated billboards** — ten creatives, perspective-mapped screens, and coordinated campaign takeovers.
+- **An explorable clock** — choose a date, pause, reverse time, or change the playback speed and weather.
+
+Built with **vanilla JavaScript and Canvas 2D**. No frontend framework or frontend build step. The scene runs locally; a small Cloudflare Worker and Durable Object provide the shared like counter.
+
+## Explore
+
+Open [**aryamandarda.com/ascii-art/nyc/**](https://aryamandarda.com/ascii-art/nyc/) and select **Immerse**. Press **H** or choose **Hide controls** for an unobstructed view. On phones, the full scene fits the display; **Zoom in** lets you drag through the details.
+
+At **1×**, one simulated minute passes each real second. Speeds range from **0.5× to 5×**. Date, lighting, weather, people, traffic, and billboards follow that clock. The browser respects reduced-motion preferences.
+
+Weather is a seasonal simulation, not a live forecast. Manual weather selections last until you choose **Natural · Date synced** or reload. This is an artwork, not a live camera or advertising feed.
 
 ## Run locally
+
+With Python 3 installed:
 
 ```sh
 git clone https://github.com/aryamandarda/ASCII.git
@@ -31,42 +45,59 @@ cd ASCII
 python3 -m http.server 8000 --directory dist
 ```
 
-Open [localhost:8000/projects/ASCII/nyc/](http://localhost:8000/projects/ASCII/nyc/) in a modern browser. Serve the files over HTTP rather than opening `index.html` directly.
+Open [localhost:8000/projects/ASCII/nyc/](http://localhost:8000/projects/ASCII/nyc/). The artwork works without the like service.
 
-## Explore
+For the complete app, including local likes and the public URL layout, use Node.js 20 or later:
 
-Select **Immerse** to enter the artwork. Use the date and time controls to explore the scene, the sunset icon to choose a palette, and the playback controls to pause or reverse time. Use **Hide controls** or **H** for a clear view.
+```sh
+npm ci
+npm run dev:worker
+```
 
-**Weather** offers Natural, Clear, Passing Clouds, Overcast, Rain, and Snow. Manual selections stay active as you change the date or play time forward/backward. Choose **Natural · Date synced** to immediately restore seasonal weather and snow history for the selected date and time. Overrides reset to Natural on reload; they do not change the calendar simulation.
+Open the local address printed by Wrangler at `/ascii-art/nyc/`.
 
-On phones, Immerse keeps the full scene visible in both portrait and landscape and tucks away the controls. The heart stays visible. Choose **Zoom in** to fill the display and drag to explore; rotating returns to the full scene. **Fullscreen** is available on desktop. On iPhone, use Safari → Share → Add to Home Screen → Open as Web App for a view without the browser toolbar.
+## How it is built
 
-Speeds range from **0.5× to 5×**. At 1×, five simulated minutes pass in five seconds. People, traffic, billboards, and lighting follow the same clock. Reduced-motion preferences are respected.
+```mermaid
+flowchart LR
+    A[Photograph and masks] --> D[Layered scene · Canvas 2D]
+    B[Calendar, weather and city simulation] --> D
+    C[Billboard image sheets] --> D
+    D --> E[Sample colors and character density]
+    E --> F[Cached glyph atlas]
+    F --> G[Visible character canvas]
+```
 
-## Mac screensaver preview
+The renderer uses a 1280 × 854 scene, perspective-mapped billboards, a 512-color palette, ordered dithering, and cached glyph pixels. A separate pedestrian mask preserves clothing colors through the character pass. Unchanged character cells reuse their previous pixels.
 
-The native `.saver` wrapper packages this same scene for offline use on Apple Silicon and Intel Macs, with natural weather and continuous 1× playback. Each activation starts at the current date/time. Controls and likes are hidden.
+| Read more | What it covers |
+| --- | --- |
+| [Rendering the scene](docs/rendering.md) | Compositing order, billboard projection, character conversion, color correction, and performance tradeoffs |
+| [Movement and weather](docs/movement-weather.md) | Gait, crowd spacing, vehicles, snow history, equations, and reference measurements |
+| [Development](DEVELOPMENT.md) | Local previews, visual review, tests, and media preparation |
+| [Hosting](docs/hosting.md) | Cloudflare routing and integration with the future personal website |
 
-See [Mac installation and testing notes](macos/INSTALL.md) and [downloadable previews](https://github.com/aryamandarda/ASCII/releases). Builds are ad-hoc signed; Apple notarization and physical Screen Saver host testing are still pending. To build on a Mac with Xcode Command Line Tools, run `bash macos/build.sh`.
+## Mac screensaver
+
+The same scene is also packaged as an offline macOS `.saver`, with Apple Silicon and Intel binaries, natural weather, and continuous 1× playback.
+
+**Experimental preview:** recurring white-screen behavior in the macOS Screen Saver host is under investigation. The web artwork is the recommended way to view the scene while that is resolved. Downloads are ad-hoc signed and are not Apple-notarized.
+
+[Preview releases](https://github.com/aryamandarda/ASCII/releases) · [Installation and limitations](macos/INSTALL.md)
 
 ## Development
 
-The complete scene lives in [`dist/projects/ASCII/nyc/`](dist/projects/ASCII/nyc/). Its [artwork notes](dist/projects/ASCII/nyc/art-notes.md) describe the renderer and simulation. See [development and website integration](DEVELOPMENT.md) for running the artwork alongside the separate personal website.
-
-Run the regression checks with Node.js 20 or later and FFmpeg installed:
-
 ```sh
-npm test
+npm test                # Scene regressions; Node.js 20+ and FFmpeg
+npm run test:worker    # Routing and like service; run npm ci first
 ```
 
-For a repeatable phone layout review, copy `scripts/review/mobile.html` into `dist/review/mobile.html`, open `/review/mobile.html` on the local server, and select **Run layout checks**. It checks ten portrait, landscape, browser-height, and safe-area configurations. Real iOS Safari and Android devices should also be checked for browser toolbar and native fullscreen behavior.
+The artwork lives in [`dist/projects/ASCII/nyc/`](dist/projects/ASCII/nyc/). Supporting areas are [`worker/`](worker/), [`macos/`](macos/), [`scripts/`](scripts/), [`tests/`](tests/), and [`docs/`](docs/).
 
-The checks cover the character pipeline, calendar and daylight calculations, billboard sequencing, gait mechanics, crowd movement, traffic, and seasonal weather. See [movement and weather mechanics](docs/movement-weather.md) for dimensions, equations, references, and the local review. No package installation is required.
+For a bug report, include your browser or macOS version, viewport size, scene date and weather, and steps to reproduce it. Changes to the scene should preserve the shared clock and include a visual review as well as the relevant regression checks.
 
-## Credits
+## Credits and rights
 
-Created by [Aryaman Darda](https://github.com/aryamandarda).
+Created by [**Aryaman Darda**](https://github.com/aryamandarda).
 
-Campaign artwork, photography, and SunCalc are credited in [Third-party notices](THIRD_PARTY_NOTICES.md).
-
-This is an artistic simulation. Crowd and traffic levels are modeled; weather is illustrative. It is not a live camera or advertising feed.
+Campaign imagery, source photography, and SunCalc retain their respective rights and notices. See [third-party notices](THIRD_PARTY_NOTICES.md) before reusing assets. No blanket license to the included photography or advertising artwork is implied.

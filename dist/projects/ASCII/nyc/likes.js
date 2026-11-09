@@ -1,7 +1,7 @@
 (() => {
   const button=document.getElementById('like'),count=document.getElementById('likeCount');
   let liked=false,busy=false,loaded=false,lastRead=0;
-  const endpoint='/api/likes/nyc';
+  const endpoint=location.pathname.startsWith('/ascii-art/nyc')?'/ascii-art/nyc/api/likes':'/api/likes/nyc';
   const compact=new Intl.NumberFormat(undefined,{notation:'compact',maximumFractionDigits:1});
   function render(data){
     if(!Number.isSafeInteger(data.count)||data.count<0||typeof data.liked!=='boolean')throw new Error('Invalid likes response');

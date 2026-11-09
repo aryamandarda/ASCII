@@ -1,8 +1,15 @@
 {
   "name": "ascii-art",
   "main": "worker/index.js",
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [
+    { "pattern": "aryamandarda.com", "custom_domain": true },
+    { "pattern": "aryamandarda.com/ascii-art/nyc", "zone_name": "aryamandarda.com" },
+    { "pattern": "aryamandarda.com/ascii-art/nyc/*", "zone_name": "aryamandarda.com" }
+  ],
   "compatibility_date": "2026-11-08",
-  "assets": { "directory": "./dist", "binding": "ASSETS", "run_worker_first": ["/api/*"] },
+  "assets": { "directory": "./dist", "binding": "ASSETS", "run_worker_first": ["/api/*", "/ascii-art/*"] },
   "durable_objects": { "bindings": [{ "name": "ARTWORK_LIKES", "class_name": "ArtworkLikes" }] },
   "migrations": [{ "tag": "likes-v1", "new_sqlite_classes": ["ArtworkLikes"] }],
   "observability": { "enabled": true, "traces": { "enabled": true } }
