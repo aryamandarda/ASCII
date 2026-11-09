@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Package the current renderer offline. Fail loudly if bootstrap hooks drift."""
 from pathlib import Path
-import json, re, shutil, sys
+import base64, json, mimetypes, re, shutil, sys
 ROOT = Path(__file__).resolve().parents[1]
 
 def replace_once(text, old, new):
@@ -15,7 +15,7 @@ def prepare(destination):
     destination.mkdir(parents=True, exist_ok=True)
     # Only runtime assets; no review harness, API client or unrelated documents.
     for path in source.rglob('*'):
-        if path.is_file() and path.suffix in {'.js', '.css', '.jpg', '.png', '.webp', '.json'} and path.name != 'likes.js':
+        if path.is_file() and path.suffix in {'.js', '.css', '.json'} and path.name != 'likes.js':
             target = destination / path.relative_to(source)
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(path, target)
@@ -23,12 +23,17 @@ def prepare(destination):
     html = replace_once(html, '<base href="/projects/ASCII/nyc/">', '<base href="./">')
     html = html.replace('<link rel="manifest" href="manifest.webmanifest">', '')
     html = html.replace('<script src="likes.js"></script>', '').replace('<script src="scene-view.js"></script>', '')
+    images = {str(p.relative_to(source)): 'data:' + mimetypes.guess_type(p.name)[0] + ';base64,' + base64.b64encode(p.read_bytes()).decode() for p in source.rglob('*') if p.suffix in {'.png', '.jpg', '.webp'}}
+    (destination / 'offline-images.js').write_text('window.ASCII_IMAGES=' + json.dumps(images) + ';\n')
+    html = replace_once(html, '<script src="fixed-screens.js">', '<script src="offline-images.js"></script>\n<script src="fixed-screens.js">')
     html = replace_once(html, '<body>', '<body class="screensaver immersed">')
     html = replace_once(html, '<script src="crowd-client.js">', '<script src="offline-worker.js"></script>\n<script src="crowd-client.js">')
     html = replace_once(html, '</head>', '<style>#experience> :not(#ambient):not(#surface){display:none!important}#surface{inset:0;filter:none;transition:none}#art{object-fit:contain}body{cursor:none}</style>\n</head>')
     (destination / 'index.html').write_text(html)
     renderer = (source / 'fixed-screens.js').read_text()
     renderer = replace_once(renderer, "playing=!matchMedia('(prefers-reduced-motion: reduce)').matches", 'playing=true')
+    renderer = replace_once(renderer, "media.src='media/'+definition.file", "media.src=window.ASCII_IMAGES['media/'+definition.file]")
+    renderer = replace_once(renderer, 'image.src=src', 'image.src=window.ASCII_IMAGES[src]')
     renderer = replace_once(renderer, 'if(playing&&!document.hidden)', 'if(playing&&!document.hidden&&window.ASCII_SAVER_RUNNING!==false)')
     renderer = replace_once(renderer, ".catch(()=>{el('loading').textContent='Please refresh'", ".catch(error=>{canvas.dataset.error=String(error);el('loading').textContent='Please refresh'")
     (destination / 'fixed-screens.js').write_text(renderer)

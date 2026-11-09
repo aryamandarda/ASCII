@@ -13,6 +13,7 @@ static void poll(WKWebView *view) {
     [view evaluateJavaScript:script completionHandler:^(id value, NSError *error) {
         if (done) return;
         if (++polls % 10 == 0) NSLog(@"WebKit observation: %@ error: %@", value, error);
+        if ([value isKindOfClass:NSDictionary.class] && [value[@"error"] length] > 0) { NSLog(@"FAIL renderer: %@", value); done = YES; return; }
         if (!error && [value isKindOfClass:NSDictionary.class] && [value[@"frame"] intValue] > 2) {
             if ([value[@"speed"] intValue] != 1 || ![value[@"weather"] isEqual:@"natural"] || ![value[@"uiHidden"] boolValue]) {
                 NSLog(@"FAIL configuration: %@", value); done = YES; return;
