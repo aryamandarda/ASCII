@@ -78,7 +78,36 @@
     const peak=Math.max(...rgb),fade=clamp((y-edge)/14,0,1);
     return peak>0?[...rgb.map(v=>linearToSrgb(v/peak)),Math.min(.42,(1-Math.exp(-peak))*wetness*texture*fade)]:[0,0,0,0];
   }
-  let groundCanvas,groundContext,groundPixels;
+  // Billboard positions and pavement geometry are fixed. Precompute their
+  // transfer weights once; only emitted RGB and weather change each frame.
+  function groundTransfer(lamps,width=128,height=86){
+    const cells=width*height,diffuse=new Float32Array(cells*lamps.length),specular=new Float32Array(cells*lamps.length),fade=new Float32Array(cells),wetFade=new Float32Array(cells);
+    for(let y=0;y<height;y++)for(let x=0;x<width;x++){
+      const i=y*width+x,X=(x+.5)*W/width,Y=(y+.5)*H/height,z=1440/Math.max(12,Y-600),px=(X-640)*z/800;
+      const edge=X<550?704-X*.10:X<745?649:620+Math.max(0,X-1110)*.18,t=clamp((Y-edge)/50,0,1);fade[i]=t*t*(3-2*t);
+      const wetEdge=X<550?704-X*.10:X<745?649:649+(X-745)*.21;
+      wetFade[i]=clamp((Y-wetEdge)/14,0,1)*(.56+.24*Math.sin(px*3.1+Math.sin(z*2.7))+.20*Math.sin(z*18+px*.8));
+      if(!fade[i]&&!wetFade[i])continue;
+      const vl=Math.hypot(px,1.8,z),view=[-px/vl,1.8/vl,-z/vl];
+      lamps.forEach((lamp,j)=>{
+        const source=lamp.position?lamp:{...lamp,...emitterGeometry(lamp)},d=[source.position[0]-px,source.position[1],source.position[2]-z],d2=d[0]*d[0]+d[1]*d[1]+d[2]*d[2],len=Math.sqrt(d2)||1;
+        const emission=Math.max(0,-(d[0]*source.normal[0]+d[1]*source.normal[1]+d[2]*source.normal[2])/len),incidence=Math.max(0,d[1]/len),k=i*lamps.length+j;
+        diffuse[k]=5.2*source.area/(d2+source.area*.5)*(.12+.88*emission)*(.22+.78*incidence);
+        const hx=d[0]/len+view[0],hy=d[1]/len+view[1],hz=d[2]/len+view[2],hl=Math.hypot(hx,hy,hz),nh=hl>0?Math.max(0,hy/hl):0;
+        specular[k]=Math.pow(nh,16+20/(1+source.area/20))*emission*source.area/(d2+source.area)*3.5;
+      });
+    }
+    return {diffuse,specular,fade,wetFade};
+  }
+  function transferPixel(transfer,index,lamps,night,wetness){
+    const energy=[0,0,0],reflection=[0,0,0];
+    for(let j=0;j<lamps.length;j++){const lamp=lamps[j],radiance=lamp.radiance||lamp.color.map(v=>srgbToLinear(v)*lamp.power),k=index*lamps.length+j;
+      for(let c=0;c<3;c++){energy[c]+=radiance[c]*transfer.diffuse[k];reflection[c]+=radiance[c]*transfer.specular[k]}
+    }
+    const peak=Math.max(...energy),wetPeak=Math.max(...reflection),luminance=energy[0]*.2126+energy[1]*.7152+energy[2]*.0722;
+    return {ground:peak>0?[...energy.map(v=>linearToSrgb(v/peak)),.52*night*transfer.fade[index]*(1-Math.exp(-luminance*1.4))]:[0,0,0,0],wet:wetPeak>0?[...reflection.map(v=>linearToSrgb(v/wetPeak)),Math.min(.42,(1-Math.exp(-wetPeak))*wetness*transfer.wetFade[index])]:[0,0,0,0]};
+  }
+  let groundCanvas,groundContext,groundPixels,wetCanvas,wetContext,wetPixels,groundKey,transfer,transferKey;
   let haloCanvas,haloContext;
   function paintBillboardGlow(g,l,screens,ground=false,skyMask,wetness=0){
     if(l.night<=0&&(!ground||wetness<=.01))return;
@@ -86,17 +115,22 @@
     if(!ground&&skyMask){if(!haloCanvas){haloCanvas=document.createElement('canvas');haloCanvas.width=W;haloCanvas.height=H;haloContext=haloCanvas.getContext('2d')}haloContext.clearRect(0,0,W,H);paintBillboardGlow(haloContext,l,screens);haloContext.globalCompositeOperation='destination-out';haloContext.drawImage(skyMask,0,0);haloContext.globalCompositeOperation='source-over';g.save();g.globalCompositeOperation='screen';g.drawImage(haloCanvas,0,0);g.restore();return}
     g.save();g.globalCompositeOperation='screen';
     if(ground){
-      if(!groundCanvas){groundCanvas=document.createElement('canvas');groundCanvas.width=128;groundCanvas.height=86;groundContext=groundCanvas.getContext('2d');groundPixels=groundContext.createImageData(128,86)}
-      const data=groundPixels.data;
-      for(let y=0;y<86;y++)for(let x=0;x<128;x++){
-        const c=groundLightAt((x+.5)*W/128,(y+.5)*H/86,l.night,lamps),i=(y*128+x)*4;
-        data[i]=c[0];data[i+1]=c[1];data[i+2]=c[2];data[i+3]=Math.round(c[3]*255);
+      if(!groundCanvas){groundCanvas=document.createElement('canvas');groundCanvas.width=128;groundCanvas.height=86;groundContext=groundCanvas.getContext('2d');groundPixels=groundContext.createImageData(128,86);wetCanvas=document.createElement('canvas');wetCanvas.width=128;wetCanvas.height=86;wetContext=wetCanvas.getContext('2d');wetPixels=wetContext.createImageData(128,86)}
+      const geometry=lamps.map(lamp=>[lamp.x,lamp.y,lamp.w,lamp.h].join(',')).join('|');if(geometry!==transferKey){transferKey=geometry;transfer=groundTransfer(lamps)}
+      const key=l.night.toFixed(3)+':'+wetness.toFixed(3)+':'+screens.map(s=>s.cacheKey||JSON.stringify(s.light)).join('|');
+      if(key!==groundKey){groundKey=key;const data=groundPixels.data;
+        for(let index=0;index<128*86;index++){
+          if(!transfer.fade[index]&&!transfer.wetFade[index])continue;
+          const {ground:c,wet:w}=transferPixel(transfer,index,lamps,l.night,wetness),i=index*4;
+          data[i]=c[0];data[i+1]=c[1];data[i+2]=c[2];data[i+3]=Math.round(c[3]*255);
+          wetPixels.data[i]=w[0];wetPixels.data[i+1]=w[1];wetPixels.data[i+2]=w[2];wetPixels.data[i+3]=Math.round(w[3]*(.25+.35*l.night)*255);
+        }
+        groundContext.putImageData(groundPixels,0,0);
+        if(wetness>.01){
+          wetContext.putImageData(wetPixels,0,0);
+        }
       }
-      groundContext.putImageData(groundPixels,0,0);g.imageSmoothingEnabled=true;g.drawImage(groundCanvas,0,0,W,H);
-      if(wetness>.01){
-        for(let y=0;y<86;y++)for(let x=0;x<128;x++){const c=wetReflectionAt((x+.5)*W/128,(y+.5)*H/86,wetness,lamps),i=(y*128+x)*4;data[i]=c[0];data[i+1]=c[1];data[i+2]=c[2];data[i+3]=Math.round(c[3]*(.25+.35*l.night)*255)}
-        groundContext.putImageData(groundPixels,0,0);g.drawImage(groundCanvas,0,0,W,H);
-      }
+      g.imageSmoothingEnabled=true;g.drawImage(groundCanvas,0,0,W,H);if(wetness>.01)g.drawImage(wetCanvas,0,0,W,H);
     }else for(const lamp of lamps){
       const x=lamp.x,y=lamp.y,rx=40+lamp.w*.75,ry=35+lamp.h*.75,strength=l.night*lamp.power*.32,c=lamp.color.join(',');
       g.save();g.translate(x,y);g.scale(rx,ry);const halo=g.createRadialGradient(0,0,0,0,0,1);
@@ -233,5 +267,5 @@
     }
     return{canvas,render,skyMask:mask,skyPixels:tail,windowCount:windows.length,distantWindowCount:windows.filter(w=>w.strength).length};
   }
-  root.CityEnvironment={paintWetScreens,reflectionAxis,neutralizePavement,wetReflectionAt,create,skyColor,sunColor,surfaceColor,billboardExposure,billboardLight,paintBillboardGlow,windowState,windowColor,groundLightAt,irradianceAt,receiverLight,materialColor,emitterGeometry,distantFacades,moonSpan,paintMoon,palettes,setPalette};if(typeof module!=='undefined')module.exports=root.CityEnvironment;
+  root.CityEnvironment={groundTransfer,transferPixel,paintWetScreens,reflectionAxis,neutralizePavement,wetReflectionAt,create,skyColor,sunColor,surfaceColor,billboardExposure,billboardLight,paintBillboardGlow,windowState,windowColor,groundLightAt,irradianceAt,receiverLight,materialColor,emitterGeometry,distantFacades,moonSpan,paintMoon,palettes,setPalette};if(typeof module!=='undefined')module.exports=root.CityEnvironment;
 })(typeof window==='undefined'?globalThis:window);

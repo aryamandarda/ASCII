@@ -8,10 +8,10 @@
   function cell(r,g,b,x=0,y=0){const n=code(r,g,b,x,y);return{color:n>>3,glyph:n&7}}
   function size(columns){return{columns,rows:Math.round(columns*854/1280*.6)}}
   // Use the contained artwork size in CSS pixels, not the monitor resolution.
-  // Preserve the phone's 390 columns; add detail as the artwork grows on desktop.
-  function columnsForView(width,height,mode='contain'){
+  // Phones retain comparable scene detail; retina screens receive a modest boost.
+  function columnsForView(width,height,mode='contain',pixelRatio=1){
     const displayed=(mode==='cover'?Math.max:Math.min)(Math.max(0,width),Math.max(0,height)*1280/854);
-    return Math.max(390,Math.min(960,Math.round(displayed/2/10)*10));
+    return Math.max(640,Math.min(960,Math.round(displayed*Math.min(1.25,Math.sqrt(Math.max(1,pixelRatio)))/2/10)*10));
   }
   root.CharacterGrid={palette,ramp,cell,code,size,columnsForView};if(typeof module!=='undefined')module.exports=root.CharacterGrid;
 })(typeof window==='undefined'?globalThis:window);

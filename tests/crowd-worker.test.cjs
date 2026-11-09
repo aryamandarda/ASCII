@@ -1,0 +1,10 @@
+const assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs'),path=require('node:path');
+const dir=path.resolve('dist/projects/ASCII/nyc');let reply;
+const sandbox={postMessage:data=>reply=data};const context=vm.createContext(sandbox);
+sandbox.importScripts=(...files)=>files.forEach(file=>vm.runInContext(fs.readFileSync(path.join(dir,file),'utf8'),context,{filename:file}));
+vm.runInContext(fs.readFileSync(path.join(dir,'crowd-worker.js'),'utf8'),context);
+const time=Date.parse('2026-11-07T22:00Z')/60000;sandbox.onmessage({data:{time}});
+assert.equal(reply.time,time);assert(reply.people.length>20);assert(reply.people.every(p=>Number.isFinite(p.x)&&p.ground.length===2));
+assert(!('route' in reply.people[0]),'Only drawing data crosses the worker boundary');
+assert.equal(sandbox.window,undefined,'Calendar dependencies must work without a DOM window');
+console.log('PASS: actual crowd worker bootstraps without a window and returns drawable pedestrians');

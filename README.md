@@ -33,7 +33,7 @@ Select **Immerse** to enter the artwork. Use the date and time controls to explo
 
 **Weather** offers Natural, Clear, Passing Clouds, Overcast, Rain, and Snow. Manual selections stay active as you change the date or play time forward/backward. Choose **Natural · Date synced** to immediately restore seasonal weather and snow history for the selected date and time. Overrides reset to Natural on reload; they do not change the calendar simulation.
 
-On phones, Immerse fills the screen and tucks away the controls. Drag to explore cropped edges, rotate freely between portrait and landscape, or choose **Full scene** in the controls. **Fullscreen** hides browser chrome where supported. On iPhone, use Safari → Share → Add to Home Screen → Open as Web App for a view without the browser toolbar.
+On phones, Immerse keeps the full scene visible in both portrait and landscape and tucks away the controls. The heart stays visible. Choose **Zoom in** to fill the display and drag to explore; rotating returns to the full scene. **Fullscreen** hides browser chrome where supported. On iPhone, use Safari → Share → Add to Home Screen → Open as Web App for a view without the browser toolbar.
 
 Speeds range from **0.5× to 5×**. At 1×, five simulated minutes pass in five seconds. People, traffic, billboards, and lighting follow the same clock. Reduced-motion preferences are respected.
 
@@ -46,6 +46,8 @@ Run the regression checks with Node.js 20 or later and FFmpeg installed:
 ```sh
 npm test
 ```
+
+For a repeatable phone layout review, copy `scripts/review/mobile.html` into `dist/review/mobile.html`, open `/review/mobile.html` on the local server, and select **Run layout checks**. It checks ten portrait, landscape, browser-height, and safe-area configurations. Real iOS Safari and Android devices should also be checked for browser toolbar and native fullscreen behavior.
 
 The checks cover the character pipeline, calendar and daylight calculations, billboard sequencing, gait mechanics, crowd movement, traffic, and seasonal weather. See [movement and weather mechanics](docs/movement-weather.md) for dimensions, equations, references, and the local review. No package installation is required.
 

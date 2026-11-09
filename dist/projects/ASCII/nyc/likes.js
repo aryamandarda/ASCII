@@ -1,5 +1,5 @@
 (() => {
-  const button=document.getElementById('like'),count=document.getElementById('likeCount'),status=document.getElementById('likeStatus');
+  const button=document.getElementById('like'),count=document.getElementById('likeCount');
   let liked=false,busy=false,loaded=false,lastRead=0;
   const endpoint='/api/likes/nyc';
   const compact=new Intl.NumberFormat(undefined,{notation:'compact',maximumFractionDigits:1});
@@ -14,15 +14,15 @@
     if(!response.ok)throw new Error('Likes unavailable');return response.json();
   }
   async function refresh(){if(busy)return;busy=true;button.disabled=true;
-    try{render(await request());lastRead=Date.now();status.textContent=''}
-    catch{if(!loaded)count.textContent='—';status.textContent='Likes unavailable. Tap the heart to retry.'}
+    try{render(await request());lastRead=Date.now()}
+    catch{if(!loaded)count.textContent=''}
     finally{busy=false;button.disabled=false}
   }
   button.onclick=async()=>{
     if(busy)return;if(!loaded){await refresh();if(!loaded)return}
-    busy=true;status.textContent='';
-    try{render(await request({method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({liked:!liked})}));status.textContent=''}
-    catch{status.textContent='Could not save your like. Please try again.'}
+    busy=true;
+    try{render(await request({method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({liked:!liked})}))}
+    catch{/* Preserve the confirmed heart and count; the next tap retries. */}
     finally{busy=false;button.disabled=false}
   };
   document.addEventListener('visibilitychange',()=>{if(!document.hidden&&Date.now()-lastRead>30000)refresh()});

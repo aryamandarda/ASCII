@@ -30,8 +30,8 @@ const sandbox={CityWeather:{...weather,paintSurfaces(){},paintPrecipitation(){},
  assert.notEqual(elements.art.dataset.motionFrames,first,'Campaign frames advance without a pause/play click');
  assert(+elements.art.dataset.simulationTime>0,'Walkers and ads share an advancing clock');
  const [out,ambient,world,sample,lightSample,atlas]=canvases;
- const columns=390,rows=grid.size(columns).rows;
- assert.equal(out.width,columns*6);assert.equal(out.height,rows*10);assert.equal(out.dataset.columns,390);
+ const columns=640,rows=grid.size(columns).rows;
+ assert.equal(out.width,columns*6);assert.equal(out.height,rows*10);assert.equal(out.dataset.columns,640);
  assert(out.context.uploads.length>0,'Character pixels must reach the visible canvas');assert.equal(out.context.uploads[0][0].data.length,out.width*out.height*4);assert(out.context.uploads[0][0].data.every(v=>v===160),'Every visible cell is copied from the glyph atlas');
  // Identical scene colors must still repaint when human coverage changes.
  vm.runInNewContext(`humanPixels.fill(0xff334455);ms.getImageData=()=>({data:new Uint8ClampedArray(cols*rows*4).fill(255)});asciiPass()`,sandbox);
@@ -51,8 +51,8 @@ const sandbox={CityWeather:{...weather,paintSurfaces(){},paintPrecipitation(){},
  const savedEpoch=out.dataset.epoch;
  elements.surface.clientWidth=1440;elements.surface.clientHeight=900;resizeCallback();
  assert(+out.dataset.columns>=670,'Desktop must render finer characters');assert.equal(out.dataset.epoch,savedEpoch,'Resize must not reset time');
- elements.surface.clientWidth=390;elements.surface.clientHeight=844;resizeCallback();assert.equal(+out.dataset.columns,390);
- vm.runInNewContext('showControls(false)',sandbox);assert(elements.controls.hidden&&elements.leave.hidden);assert.equal(elements.controlsToggle.attributes['aria-label'],'Show controls');
+ elements.surface.clientWidth=390;elements.surface.clientHeight=844;resizeCallback();assert.equal(+out.dataset.columns,640);
+ vm.runInNewContext('showControls(false)',sandbox);assert(elements.controls.hidden);assert.equal(elements.likeWidget.hidden,false,'Heart stays visible when controls close');assert.equal(elements.controlsToggle.attributes['aria-label'],'Show controls');
  elements.controlsToggle.onclick();assert.equal(elements.controls.hidden,false);assert.equal(elements.controlsToggle.attributes['aria-label'],'Hide controls');
  vm.runInNewContext('immersed=true',sandbox);sandbox.document.activeElement={tagName:'BUTTON'};
  listeners.keydown({key:'h',code:'KeyH',preventDefault(){}});assert(elements.controls.hidden,'H works after clicking a button');

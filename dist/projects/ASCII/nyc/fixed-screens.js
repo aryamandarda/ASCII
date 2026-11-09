@@ -16,9 +16,14 @@ palette.forEach(([r,g,b],ci)=>{for(let j=0;j<8;j++){hg.fillStyle=`rgb(${r*.18},$
 const humanPixels=new Uint32Array(hg.getImageData(0,0,humanAtlas.width,humanAtlas.height).data.buffer);
 const humanMask=document.createElement('canvas');humanMask.width=1280;humanMask.height=854;const hm=humanMask.getContext('2d');
 const maskSample=document.createElement('canvas'),ms=maskSample.getContext('2d',{willReadFrequently:true});
+const compactAtlas=document.createElement('canvas');compactAtlas.width=atlas.width/2;compactAtlas.height=atlas.height/2;
+const cg=compactAtlas.getContext('2d');cg.drawImage(atlas,0,0,compactAtlas.width,compactAtlas.height);const compactPixels=new Uint32Array(cg.getImageData(0,0,compactAtlas.width,compactAtlas.height).data.buffer);
+cg.clearRect(0,0,compactAtlas.width,compactAtlas.height);cg.drawImage(humanAtlas,0,0,compactAtlas.width,compactAtlas.height);const compactHumanPixels=new Uint32Array(cg.getImageData(0,0,compactAtlas.width,compactAtlas.height).data.buffer);
+let glyphWidth=6,glyphHeight=10;
 let outputPixels,outputWords;
 
 let environment,ready=false,playing=!matchMedia('(prefers-reduced-motion: reduce)').matches,epoch=Date.now(),speed=1,direction=1,time=epoch/60000,last=0,lastPaint=0,cols=390,rows=156,previousCells,frameNumber=0,immersed=false;
+const crowd=typeof CityCrowd==='undefined'?CityLife:CityCrowd.create(()=>{if(ready&&!playing)requestAnimationFrame(draw)});
 const ambient=el('ambient').getContext('2d',{alpha:false});
 const colors=['#d80a25','#66aee9','#ed1017','#9e9edb','#5cbec9','#b83c30','#405064','#183329','#239ab9','#bf754b'];
 const definitions=[...MotionManifest,...['motown','chrysler','wicked','phantom','annie'].map(n=>({file:'poster-'+n+'.png'}))];
@@ -56,43 +61,44 @@ function asciiPass(){
   for(let y=0;y<rows;y++)for(let x=0;x<cols;x++){
     const index=y*cols+x,k=index*4,human=coverage[k+3]>180,n=cellCode(d[k],d[k+1],d[k+2],x,y)+(human?4096:0);if(previousCells[index]===n)continue;
     previousCells[index]=n;minRow=Math.min(minRow,y);maxRow=Math.max(maxRow,y);
-    const ci=(n&4095)>>3,j=n&7,pixels=human?humanPixels:atlasPixels;
-    for(let row=0;row<10;row++){
-      const source=(j*10+row)*atlas.width+ci*6,target=(y*10+row)*canvas.width+x*6;
+    const ci=(n&4095)>>3,j=n&7,small=glyphWidth===3,pixels=human?(small?compactHumanPixels:humanPixels):(small?compactPixels:atlasPixels),atlasWidth=small?atlas.width/2:atlas.width;
+    for(let row=0;row<glyphHeight;row++){
+      const source=(j*glyphHeight+row)*atlasWidth+ci*glyphWidth,target=(y*glyphHeight+row)*canvas.width+x*glyphWidth;
       outputWords[target]=pixels[source];outputWords[target+1]=pixels[source+1];outputWords[target+2]=pixels[source+2];
-      outputWords[target+3]=pixels[source+3];outputWords[target+4]=pixels[source+4];outputWords[target+5]=pixels[source+5];
+      if(!small){outputWords[target+3]=pixels[source+3];outputWords[target+4]=pixels[source+4];outputWords[target+5]=pixels[source+5]}
     }
   }
-  if(maxRow>=minRow)output.putImageData(outputPixels,0,0,0,minRow*10,canvas.width,(maxRow-minRow+1)*10);
+  if(maxRow>=minRow)output.putImageData(outputPixels,0,0,0,minRow*glyphHeight,canvas.width,(maxRow-minRow+1)*glyphHeight);
 }
 
 const dateFormat=new Intl.DateTimeFormat('en-US',{timeZone:CityCalendar.zone,month:'short',day:'numeric',year:'numeric'}),timeFormat=new Intl.DateTimeFormat('en-US',{timeZone:CityCalendar.zone,hour:'numeric',minute:'2-digit'});
 function updateTime(){const p=CityCalendar.parts(epoch);el('dateValue').textContent=dateFormat.format(new Date(epoch));el('date').value=p.date;el('timeValue').textContent=timeFormat.format(new Date(epoch));el('time').value=p.hour*60;el('time').style.setProperty('--progress',`${p.hour/24*100}%`)}
 let weatherMode='natural';
 function draw(){if(!ready)return;const start=performance.now();time=epoch/60000;ctx.setTransform(1,0,0,1,0,0);const weather=CityWeather.simulate(epoch,weatherMode);ctx.drawImage(environment.render(epoch,weather),0,0);const tEnvironment=performance.now();
-  const light=CityCalendar.lightAt(epoch),people=CityLife.peopleAt(time),cars=CityTraffic.carsAt(time);const tCrowd=performance.now();
+  const light=CityCalendar.lightAt(epoch),people=crowd.peopleAt(time),cars=CityTraffic.carsAt(time);const tCrowd=performance.now();
   for(const screen of screens){const state=adAt(screen.index,time),ad=ads[state.ad];if(ad.ready)screenAd(screen,ad,state,light)}
   CityEnvironment.paintBillboardGlow(ctx,light,screens,false,environment.skyMask);
   for(const screen of screens){if(!screen.light)continue;ctx.save();path(screen.p);ctx.clip();project(screen);ctx.restore()}
   const tAds=performance.now();CityWeather.paintSurfaces(ctx,weather,light);CityEnvironment.paintBillboardGlow(ctx,light,screens,true,undefined,weather.wetness);CityEnvironment.paintWetScreens(ctx,light,screens,weather.wetness,project);for(const car of cars)CityTraffic.groundLights(ctx,car,light);
-  const lamps=screens.map(s=>s.light).filter(Boolean),receiver=(p,h)=>CityEnvironment.receiverLight(light,p.x,p.y,h,lamps);
+  const tGround=performance.now();const lamps=screens.map(s=>s.light).filter(Boolean),receiver=(p,h)=>CityEnvironment.receiverLight(light,p.x,p.y,h,lamps);
   const layers=[...cars.map(c=>({y:c.y,paint:(g=ctx)=>CityTraffic.paintCar(g,c,receiver(c,.8))})),...people.map(p=>({y:p.y,human:true,paint:(g=ctx)=>CityLife.paintWalker(g,p,receiver(p,1),weather)})),...CityLife.furnitureLayers(weather,light).map(layer=>({y:layer.y,paint:(g=ctx)=>layer.paint(g)}))].sort((a,b)=>a.y-b.y);
   hm.clearRect(0,0,1280,854);
   for(const layer of layers){layer.paint();hm.globalCompositeOperation=layer.human?'source-over':'destination-out';layer.paint(hm)}
-  CityWeather.paintPrecipitation(ctx,weather,light,epoch);
-  const tScene=performance.now();asciiPass();const tAscii=performance.now();canvas.dataset.renderStages=JSON.stringify({environment:tEnvironment-start,crowd:tCrowd-tEnvironment,ads:tAds-tCrowd,scene:tScene-tAds,ascii:tAscii-tScene});ambient.drawImage(canvas,0,0,120,80);updateTime();canvas.dataset.weatherMode=weatherMode;canvas.dataset.weather=weather.kind;canvas.dataset.snow=weather.groundSnow.toFixed(2);canvas.dataset.cloud=weather.cloud.toFixed(2);canvas.dataset.temperature=weather.temperature.toFixed(1);canvas.dataset.moonPhase=light.moonPhase.toFixed(3);canvas.dataset.renderMs=(performance.now()-start).toFixed(1);canvas.dataset.columns=cols;canvas.dataset.adAssignments=screens.map(s=>s.lastAd).join(',');canvas.dataset.frame=++frameNumber;canvas.dataset.simulationTime=time.toFixed(4);canvas.dataset.epoch=epoch.toFixed(0);canvas.dataset.date=light.date;canvas.dataset.people=people.length;canvas.dataset.vehicles=cars.length;canvas.dataset.vehicleDirections=cars.map(c=>c.lane).join(',');canvas.dataset.windows=environment.windowCount;canvas.dataset.distantWindows=environment.distantWindowCount;canvas.dataset.cloudMode=weather.cloud>.78?'overcast':weather.cloud>.37?'passing':'clear';canvas.dataset.hour=light.hour.toFixed(3);canvas.dataset.speed=speed;canvas.dataset.direction=direction;canvas.dataset.sunrise=new Date(light.sunrise).toISOString();canvas.dataset.sunset=new Date(light.sunset).toISOString();canvas.dataset.motionFrames=ads.slice(0,5).map(a=>Math.floor(time*a.fps)%a.frames).join(',');canvas.dataset.skyPixels=environment.skyPixels;
+  const tActors=performance.now();CityWeather.paintPrecipitation(ctx,weather,light,epoch);
+  const tScene=performance.now();asciiPass();const tAscii=performance.now();canvas.dataset.renderStages=JSON.stringify({environment:tEnvironment-start,crowd:tCrowd-tEnvironment,ads:tAds-tCrowd,scene:tScene-tAds,ground:tGround-tAds,actors:tActors-tGround,precipitation:tScene-tActors,ascii:tAscii-tScene});ambient.drawImage(canvas,0,0,120,80);updateTime();canvas.dataset.weatherMode=weatherMode;canvas.dataset.weather=weather.kind;canvas.dataset.snow=weather.groundSnow.toFixed(2);canvas.dataset.cloud=weather.cloud.toFixed(2);canvas.dataset.temperature=weather.temperature.toFixed(1);canvas.dataset.moonPhase=light.moonPhase.toFixed(3);canvas.dataset.renderMs=(performance.now()-start).toFixed(1);canvas.dataset.columns=cols;canvas.dataset.glyphWidth=glyphWidth;canvas.dataset.adAssignments=screens.map(s=>s.lastAd).join(',');canvas.dataset.frame=++frameNumber;canvas.dataset.simulationTime=time.toFixed(4);canvas.dataset.epoch=epoch.toFixed(0);canvas.dataset.date=light.date;canvas.dataset.people=people.length;canvas.dataset.crowdMode=crowd.mode?crowd.mode():'main';canvas.dataset.vehicles=cars.length;canvas.dataset.vehicleDirections=cars.map(c=>c.lane).join(',');canvas.dataset.windows=environment.windowCount;canvas.dataset.distantWindows=environment.distantWindowCount;canvas.dataset.cloudMode=weather.cloud>.78?'overcast':weather.cloud>.37?'passing':'clear';canvas.dataset.hour=light.hour.toFixed(3);canvas.dataset.speed=speed;canvas.dataset.direction=direction;canvas.dataset.sunrise=new Date(light.sunrise).toISOString();canvas.dataset.sunset=new Date(light.sunset).toISOString();canvas.dataset.motionFrames=ads.slice(0,5).map(a=>Math.floor(time*a.fps)%a.frames).join(',');canvas.dataset.skyPixels=environment.skyPixels;
 }
 function resizeGrid(){
-  const view=el('surface'),next=columnsForView(view.clientWidth,view.clientHeight,typeof SceneView!=='undefined'?SceneView.mode():'contain');
-  if(previousCells&&next===cols)return;
-  cols=next;rows=size(cols).rows;canvas.width=cols*6;canvas.height=rows*10;sample.width=cols;sample.height=rows;maskSample.width=cols;maskSample.height=rows;previousCells=new Uint16Array(cols*rows);previousCells.fill(65535);outputPixels=output.createImageData(canvas.width,canvas.height);outputWords=new Uint32Array(outputPixels.data.buffer);draw()}
+  const view=el('surface'),next=columnsForView(view.clientWidth,view.clientHeight,typeof SceneView!=='undefined'?SceneView.mode():'contain',typeof devicePixelRatio==='number'?devicePixelRatio:1),small=typeof SceneView!=='undefined'&&SceneView.compact();
+  if(previousCells&&next===cols&&glyphWidth===(small?3:6))return;
+  glyphWidth=small?3:6;glyphHeight=small?5:10;
+  cols=next;rows=size(cols).rows;canvas.width=cols*glyphWidth;canvas.height=rows*glyphHeight;sample.width=cols;sample.height=rows;maskSample.width=cols;maskSample.height=rows;previousCells=new Uint16Array(cols*rows);previousCells.fill(65535);outputPixels=output.createImageData(canvas.width,canvas.height);outputWords=new Uint32Array(outputPixels.data.buffer);draw()}
 
 let resizeTimer;
 const gridObserver=new ResizeObserver(()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(()=>{if(ready)resizeGrid()},100)});
 gridObserver.observe(el('surface'));
 let controlsHidden=false;
 function showControls(show){
-  controlsHidden=!show;el('likeWidget').hidden=!show;el('controls').hidden=!show;el('leave').hidden=!show;
+  controlsHidden=!show;el('likeWidget').hidden=false;el('controls').hidden=!show;el('leave').hidden=!immersed;
   el('controlsToggle').setAttribute('aria-expanded',String(show));
   el('controlsToggle').setAttribute('aria-label',show?'Hide controls':'Show controls');
   el('controlsToggle').title=show?'Hide controls (H)':'Show controls (H)';
@@ -110,7 +116,7 @@ function closeWeather(){el('weatherOptions').hidden=true;el('weather').setAttrib
 el('weather').onclick=()=>{const open=el('weatherOptions').hidden;el('skyOptions').hidden=true;el('sky').setAttribute('aria-expanded','false');el('weatherOptions').hidden=!open;el('weather').setAttribute('aria-expanded',String(open))};
 document.querySelectorAll('[data-weather]').forEach(b=>b.onclick=()=>{weatherMode=b.dataset.weather;document.querySelectorAll('[data-weather]').forEach(option=>option.setAttribute('aria-pressed',String(option.dataset.weather===weatherMode)));el('weather').title='Weather: '+b.textContent;closeWeather();el('weather').focus({preventScroll:true});draw()});
 el('date').onchange=()=>{if(!/^\d{4}-\d{2}-\d{2}$/.test(el('date').value))return;epoch=CityCalendar.localEpoch(el('date').value,Math.floor(CityCalendar.parts(epoch).hour*60));draw()};
-function enter(){immersed=true;el('controlsToggle').hidden=false;showControls(true);el('immerse').setAttribute('tabindex','-1');el('immerse').setAttribute('aria-hidden','true');requestAnimationFrame(()=>{document.body.classList.add('immersed');if(typeof SceneView!=='undefined')resizeGrid()});el('leave').focus({preventScroll:true});if(typeof SceneView!=='undefined'){SceneView.enter(resizeGrid,showControls);return}const request=document.documentElement.requestFullscreen;if(request&&!document.fullscreenElement){const p=request.call(document.documentElement);if(p&&p.catch)p.catch(()=>{})}}
+function enter(){immersed=true;el('controlsToggle').hidden=false;showControls(true);el('immerse').setAttribute('tabindex','-1');el('immerse').setAttribute('aria-hidden','true');document.body.classList.add('immersed');el('leave').focus({preventScroll:true});if(typeof SceneView!=='undefined'){SceneView.enter(resizeGrid,showControls);return}const request=document.documentElement.requestFullscreen;if(request&&!document.fullscreenElement){const p=request.call(document.documentElement);if(p&&p.catch)p.catch(()=>{})}}
 function leave(){immersed=false;if(typeof SceneView!=='undefined')SceneView.leave();el('likeWidget').hidden=false;el('controlsToggle').hidden=true;document.body.classList.remove('immersed');el('controls').hidden=true;el('leave').hidden=true;el('immerse').removeAttribute('tabindex');el('immerse').removeAttribute('aria-hidden');el('immerse').focus({preventScroll:true});if(document.fullscreenElement||document.webkitFullscreenElement){const exit=document.exitFullscreen||document.webkitExitFullscreen;if(exit)try{Promise.resolve(exit.call(document)).catch(()=>{})}catch{}} }
 el('immerse').onclick=enter;el('leave').onclick=leave;
 document.addEventListener('keydown',event=>{if(event.key==='Escape'&&immersed)leave();if(event.key.toLowerCase()==='h'&&immersed&&!['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)&&!document.activeElement.isContentEditable){event.preventDefault();showControls(controlsHidden)}if(event.code==='Space'&&immersed&&!['INPUT','BUTTON','SELECT','TEXTAREA'].includes(document.activeElement.tagName)){event.preventDefault();el('play').click()}});
