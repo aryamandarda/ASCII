@@ -7,6 +7,7 @@ static int result = 1;
 static int polls = 0;
 static double firstEpoch = 0;
 static CFAbsoluteTime firstObserved = 0;
+static ScreenSaverView *testedSaver;
 
 static void poll(WKWebView *view) {
     NSString *script = @"(()=>{const c=document.getElementById('art');return c&&c.dataset.frame?{frame:+c.dataset.frame,epoch:+c.dataset.epoch,speed:+c.dataset.speed,weather:c.dataset.weatherMode,people:+c.dataset.people,uiHidden:getComputedStyle(document.getElementById('likeWidget')).display==='none'&&getComputedStyle(document.getElementById('controls')).display==='none'&&getComputedStyle(document.getElementById('immerse')).display==='none'}:{ready:document.readyState,error:c?.dataset.error||'',text:document.body?.innerText||'',hidden:document.hidden}})()";
@@ -19,7 +20,14 @@ static void poll(WKWebView *view) {
                 NSLog(@"FAIL configuration: %@", value); done = YES; return;
             }
             if (!firstEpoch) { firstEpoch = [value[@"epoch"] doubleValue]; firstObserved = CFAbsoluteTimeGetCurrent(); }
-            if (CFAbsoluteTimeGetCurrent() - firstObserved >= 3 && [value[@"epoch"] doubleValue] > firstEpoch + 30000 && [value[@"people"] intValue] > 0) {
+            NSImageView *nativeView = [testedSaver valueForKey:@"frameView"];
+            NSBitmapImageRep *pixels = [[NSBitmapImageRep alloc] initWithData:nativeView.image.TIFFRepresentation];
+            BOOL colored = NO;
+            for (NSInteger y=0; y<pixels.pixelsHigh; y+=32) for (NSInteger x=0; x<pixels.pixelsWide; x+=32) {
+                NSColor *color = [[pixels colorAtX:x y:y] colorUsingColorSpace:NSColorSpace.deviceRGBColorSpace];
+                if (color.redComponent + color.greenComponent + color.blueComponent > .5) colored = YES;
+            }
+            if (CFAbsoluteTimeGetCurrent() - firstObserved >= 20 && [value[@"epoch"] doubleValue] > firstEpoch + 30000 && [[testedSaver valueForKey:@"presentedFrames"] intValue] > 5 && colored) {
                 NSLog(@"PASS offline WebKit animation: %@", value); result = 0; done = YES; return;
             }
         }
@@ -38,18 +46,23 @@ int main(int argc, const char *argv[]) {
         NSRect frame = NSMakeRect(0,0,960,640);
         NSWindow *window = [[NSWindow alloc] initWithContentRect:frame styleMask:NSWindowStyleMaskBorderless backing:NSBackingStoreBuffered defer:NO];
         ScreenSaverView *saver = [[principal alloc] initWithFrame:frame isPreview:YES];
+        testedSaver = saver;
         window.contentView = saver;
         [window makeKeyAndOrderFront:nil];
         [NSApp activate];
         [saver startAnimation];
         WKWebView *web = [saver valueForKey:@"webView"];
         if (!web) return 1;
+        // Model the failure mode: the visible output must not depend on WebKit's
+        // composited layer or its background requestAnimationFrame scheduler.
+        web.alphaValue = 0;
         poll(web);
         NSDate *deadline = [NSDate dateWithTimeIntervalSinceNow:120];
         while (!done && deadline.timeIntervalSinceNow > 0) {
             NSEvent *event = [NSApp nextEventMatchingMask:NSEventMaskAny untilDate:[NSDate dateWithTimeIntervalSinceNow:0.1] inMode:NSDefaultRunLoopMode dequeue:YES];
             if (event) [NSApp sendEvent:event];
             [NSApp updateWindows];
+            [saver animateOneFrame];
         }
         [saver stopAnimation];
         if ([saver valueForKey:@"webView"] != nil) result = 1;

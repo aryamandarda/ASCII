@@ -34,7 +34,21 @@ def prepare(destination):
     renderer = replace_once(renderer, "playing=!matchMedia('(prefers-reduced-motion: reduce)').matches", 'playing=true')
     renderer = replace_once(renderer, "media.src='media/'+definition.file", "media.src=window.ASCII_IMAGES['media/'+definition.file]")
     renderer = replace_once(renderer, 'image.src=src', 'image.src=window.ASCII_IMAGES[src]')
-    renderer = replace_once(renderer, 'if(playing&&!document.hidden)', 'if(playing&&!document.hidden&&window.ASCII_SAVER_RUNNING!==false)')
+    # ScreenSaverView owns the clock. The legacy host can report the page hidden
+    # and suppress WebKit compositing/rAF even while the saver is on screen.
+    renderer = renderer.replace('requestAnimationFrame(loop)', 'void 0')
+    renderer += '''
+const nativeCapture=document.createElement('canvas');
+window.ASCII_NATIVE_FRAME=function(now,width,height){
+  if(!ready)return {error:canvas.dataset.error||'',ready:false};
+  const dt=last?Math.max(0,Math.min(1,(now-last)/1000)):0;last=now;
+  epoch=CityCalendar.advance(epoch,dt,1,1);draw();
+  const w=Math.max(320,Math.min(1920,Math.round(width))),h=Math.round(w*854/1280);
+  if(nativeCapture.width!==w||nativeCapture.height!==h){nativeCapture.width=w;nativeCapture.height=h}
+  nativeCapture.getContext('2d').drawImage(canvas,0,0,w,h);
+  return {image:nativeCapture.toDataURL('image/jpeg',.94),frame:frameNumber,epoch:epoch};
+};
+'''
     renderer = replace_once(renderer, ".catch(()=>{el('loading').textContent='Please refresh'", ".catch(error=>{canvas.dataset.error=String(error);el('loading').textContent='Please refresh'")
     (destination / 'fixed-screens.js').write_text(renderer)
     # A blob worker avoids file:// cross-origin imports without WebKit private
