@@ -44,7 +44,7 @@ Each pedestrian’s geometry, lighting, and material colors are calculated once.
 
 ## 6. Convert the finished scene into characters
 
-[`character-grid.js`](../web/artworks/nyc/character-grid.js) and [`fixed-screens.js`](../web/artworks/nyc/fixed-screens.js) implement the final pass:
+[`character-grid.js`](../web/artworks/nyc/character-grid.js) and [`renderer.js`](../web/artworks/nyc/renderer.js) implement the final pass:
 
 1. Choose a character grid appropriate to the viewport. Rows follow `round(columns × 854 / 1280 × 0.6)` to account for the glyph aspect ratio.
 2. Downsample the composed scene and pedestrian mask to one sample per character cell.

@@ -23,7 +23,7 @@ else:
  html=html.replace('<script src="vendor/suncalc.js">','<script>const REVIEW_ASSETS='+json.dumps(assets)+';</script><script src="vendor/suncalc.js">')
  def inline(m):
   code=(scene/m[1]).read_text()
-  if m[1]=='fixed-screens.js':
+  if m[1]=='renderer.js':
    code=code.replace("media.src='media/'+definition.file", "media.src=REVIEW_ASSETS['media/'+definition.file]").replace('image.src=src','image.src=REVIEW_ASSETS[src]')
   return '<script>'+code.replace('</script','<\\/script')+'</script>'
  html=re.sub(r'<script src="([^"]+)"></script>',inline,html)

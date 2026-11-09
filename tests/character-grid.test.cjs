@@ -24,7 +24,7 @@ const sandbox={CityCrowd:{create:()=>({isReady:()=>crowdReady,peopleAt:t=>crowdR
  ResizeObserver:class{constructor(fn){resizeCallback=fn}observe(){}},
  matchMedia:()=>({matches:false}),performance:{now:()=>0},requestAnimationFrame(fn){nextFrame=fn},setTimeout(fn){fn()},clearTimeout(){}};
 (async()=>{
- vm.runInNewContext(fs.readFileSync('web/artworks/nyc/fixed-screens.js','utf8'),sandbox);
+ vm.runInNewContext(fs.readFileSync('web/artworks/nyc/renderer.js','utf8'),sandbox);
  images.forEach(i=>i.onload());await new Promise(resolve=>setImmediate(resolve));
  assert(nextFrame,'Fresh load must start the animation loop');
  assert.equal(elements.art.context.uploads.length,0,'Do not reveal the background while the initial crowd is pending');

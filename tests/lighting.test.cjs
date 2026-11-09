@@ -10,5 +10,5 @@ for(const hour of [6.6,8,12,16.7]){const rgb=sunColor(light(hour)),average=[0,0,
 for(let c=0;c<256;c+=17)for(let y=0;y<4;y++)for(let x=0;x<4;x++){const rgb=palette[cell(c,c,c,x,y).color];assert.equal(rgb[0],rgb[1]);assert.equal(rgb[1],rgb[2])}
 assert.deepEqual(surfaceColor([43,127,211],light(12)),[43,127,211]);assert.notDeepEqual(skyColor(light(6.5),1),skyColor(light(16.8),1));
 for(let h=0;h<24;h+=1/360){const a=skyColor(light(h),.7),b=skyColor(light(h+1/360),.7);assert(Math.max(...a.map((v,i)=>Math.abs(v-b[i])))<3,'No lighting threshold jumps')}
-assert(!fs.readFileSync('web/artworks/nyc/fixed-screens.js','utf8').includes('times-square-empty-night.jpg'));
+assert(!fs.readFileSync('web/artworks/nyc/renderer.js','utf8').includes('times-square-empty-night.jpg'));
 console.log('PASS: blue daytime sky, yellow sun, distinct dawn/dusk, continuous light, neutral grays and fixed geometric plate.');
