@@ -41,7 +41,8 @@ const sandbox={CityCrowd:{create:()=>({isReady:()=>crowdReady,peopleAt:t=>crowdR
  assert.equal(new Uint32Array(out.context.uploads.at(-1)[0].data.buffer)[0],0xff334455,'Covered cells use character-first human atlas');
  vm.runInNewContext(`ms.getImageData=()=>({data:new Uint8ClampedArray(cols*rows*4)});asciiPass()`,sandbox);
  assert(out.context.uploads.at(-1)[0].data.every(v=>v===160),'Vacated cells restore scene atlas even with unchanged RGB');
- assert.equal(sample.context.draws[0][0],world);assert.deepEqual(sample.context.draws[0].slice(1),[0,0,columns,rows]);assert(world.context.draws.length>model.boards.length);
+ assert.equal(sample.context.draws[0][0],world);assert.deepEqual(sample.context.draws[0].slice(1),[0,0,columns,rows]);assert(vm.runInNewContext('billboardContext.draws.length',sandbox)>=model.boards.length*4,'All billboard faces are projected into the cached layer');
+ const projected=vm.runInNewContext('billboardContext.draws.length',sandbox);vm.runInNewContext('paintBillboards()',sandbox);assert.equal(vm.runInNewContext('billboardContext.draws.length',sandbox),projected,'Unchanged billboards reuse their perspective layer');
  const html=fs.readFileSync('web/artworks/nyc/index.html','utf8');assert(!html.includes('id="density"'),'The density slider is removed');
  const completedFrame=out.dataset.frame;crowdReady=false;elements.time.value='240';elements.time.oninput();assert.equal(out.dataset.frame,completedFrame,'A date/time seek holds the last complete scene while the crowd loads');crowdReady=true;elements.time.oninput();const quiet=+out.dataset.people;elements.time.value='1020';elements.time.oninput();assert(+out.dataset.people>quiet*3);
  elements.play.onclick();const paused=out.dataset.simulationTime;nextFrame(1540);nextFrame(1720);assert.equal(out.dataset.simulationTime,paused);

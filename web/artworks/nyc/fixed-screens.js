@@ -42,7 +42,7 @@ function path(points,g=ctx){g.beginPath();points.forEach((p,i)=>i?g.lineTo(...p)
 function project(screen,g=ctx){const img=screen.stage;for(const {uv,dst}of screen.triangles){const s=uv.map(p=>[p[0]*img.width,p[1]*img.height]);const [[x0,y0],[x1,y1],[x2,y2]]=s,[[a0,b0],[a1,b1],[a2,b2]]=dst,den=x0*(y1-y2)+x1*(y2-y0)+x2*(y0-y1);const a=(a0*(y1-y2)+a1*(y2-y0)+a2*(y0-y1))/den,b=(b0*(y1-y2)+b1*(y2-y0)+b2*(y0-y1))/den,c=(a0*(x2-x1)+a1*(x0-x2)+a2*(x1-x0))/den,d=(b0*(x2-x1)+b1*(x0-x2)+b2*(x1-x0))/den,e=(a0*(x1*y2-x2*y1)+a1*(x2*y0-x0*y2)+a2*(x0*y1-x1*y0))/den,f=(b0*(x1*y2-x2*y1)+b1*(x2*y0-x0*y2)+b2*(x0*y1-x1*y0))/den;
 g.save();const center=[(a0+a1+a2)/3,(b0+b1+b2)/3];path(dst.map(p=>[p[0]+(p[0]-center[0])*.006,p[1]+(p[1]-center[1])*.006]),g);g.clip();g.transform(a,b,c,d,e,f);g.drawImage(img,0,0);g.restore()}}
 function noise(n){const k=Math.sin(n*127.1+31.7)*43758.5453;return k-Math.floor(k)}
-function screenAd(screen,ad,state,light){const {g,stage,index}=screen;if(screen.lastAd!==state.ad){screen.lastAd=state.ad;screen.changed=time}const cacheKey=state.ad+':'+Math.floor(time*6)+':'+Math.round(light.night*255);if(screen.cacheKey===cacheKey)return;screen.cacheKey=cacheKey;g.fillStyle=ad.color;g.fillRect(0,0,stage.width,stage.height);g.imageSmoothingEnabled=true;g.imageSmoothingQuality='high';const fit=Math.max(stage.width/ad.w,stage.height/ad.h),w=ad.w*fit,h=ad.h*fit;const frame=ad.frames?((Math.floor(time*ad.fps)%ad.frames)+ad.frames)%ad.frames:0;
+function screenAd(screen,ad,state,light){const {g,stage,index}=screen;if(screen.lastAd!==state.ad){screen.lastAd=state.ad;screen.changed=time}const tick=Math.floor(time*6),change=adAt(index,time-1/6).ad!==state.ad||adAt(index,time+1/6).ad!==state.ad,glitch=change||((tick+index*11)%97===0);const cacheKey=state.ad+':'+(ad.frames?Math.floor(time*ad.fps)%ad.frames:'still')+':'+Math.round(light.night*255)+':'+(glitch?tick:'clean');if(screen.cacheKey===cacheKey)return;screen.cacheKey=cacheKey;g.fillStyle=ad.color;g.fillRect(0,0,stage.width,stage.height);g.imageSmoothingEnabled=true;g.imageSmoothingQuality='high';const fit=Math.max(stage.width/ad.w,stage.height/ad.h),w=ad.w*fit,h=ad.h*fit;const frame=ad.frames?((Math.floor(time*ad.fps)%ad.frames)+ad.frames)%ad.frames:0;
 if(ad.frames){g.drawImage(ad.media,(frame%ad.columns)*ad.w,Math.floor(frame/ad.columns)*ad.h,ad.w,ad.h,Math.round((stage.width-w)/2),Math.round((stage.height-h)/2),Math.round(w),Math.round(h))}else g.drawImage(ad.media,Math.round((stage.width-w)/2),Math.round((stage.height-h)/2),Math.round(w),Math.round(h));
 
 // Ribbon displays use a legible wordmark instead of shrinking a full poster
@@ -53,7 +53,7 @@ if(screen.aspect>3){
   g.font=`bold ${Math.round(stage.height*.65)}px monospace`;g.textAlign='center';g.textBaseline='middle';g.fillText(label,stage.width/2,stage.height*.52,stage.width*.94);
 }
 // A couple of coarse static ticks on ad changes, never a dissolve or a smooth wipe.
-const change=adAt(index,time-1/6).ad!==state.ad||adAt(index,time+1/6).ad!==state.ad,tick=Math.floor(time*6);if(change||((tick+index*11)%97===0)){g.globalAlpha=change?.18:.075;g.fillStyle='#dce5d0';for(let n=0;n<(change?12:4);n++){const x=Math.floor(noise(n+tick*7+index)*stage.width/6)*6,y=Math.floor(noise(n+index*13+tick*3)*stage.height/8)*8;g.fillRect(x,y,6+Math.floor(noise(n+index)*3)*6,3)}g.globalAlpha=1}
+if(glitch){g.globalAlpha=change?.18:.075;g.fillStyle='#dce5d0';for(let n=0;n<(change?12:4);n++){const x=Math.floor(noise(n+tick*7+index)*stage.width/6)*6,y=Math.floor(noise(n+index*13+tick*3)*stage.height/8)*8;g.fillRect(x,y,6+Math.floor(noise(n+index)*3)*6,3)}g.globalAlpha=1}
 // Brighten emitted light without changing screen geometry or washing out blacks.
 g.globalCompositeOperation='screen';g.globalAlpha=CityEnvironment.billboardExposure(light);g.drawImage(stage,0,0);g.globalAlpha=1;g.globalCompositeOperation='source-over';
 lightContext.drawImage(stage,index*8,0,8,8);screen.lightDirty=true;
@@ -64,6 +64,18 @@ function updateScreenLights(){
   // process once per billboard. Each display still samples the same 8×8 pixels.
   const width=lightSample.width,pixels=lightContext.getImageData(0,0,width,8).data;
   for(const screen of changed){const rgb=[0,0,0];for(let y=0;y<8;y++)for(let x=0;x<8;x++){const i=(y*width+screen.index*8+x)*4;for(let c=0;c<3;c++)rgb[c]+=pixels[i+c]/64}screen.light=CityEnvironment.billboardLight(screen.p,rgb);screen.lightDirty=false}
+}
+// Perspective projection only changes when a display changes. Reuse the
+// complete transparent layer between those six-per-second creative updates.
+const billboardLayer=document.createElement('canvas');billboardLayer.width=1280;billboardLayer.height=854;
+const billboardContext=billboardLayer.getContext('2d',{willReadFrequently:true});let billboardLayerKey;
+function paintBillboards(){
+  const key=screens.map(screen=>screen.cacheKey||'').join('|');
+  if(key!==billboardLayerKey){
+    billboardLayerKey=key;billboardContext.clearRect(0,0,1280,854);
+    for(const screen of screens){if(!screen.light)continue;billboardContext.save();path(screen.p,billboardContext);billboardContext.clip();project(screen,billboardContext);billboardContext.restore()}
+  }
+  ctx.drawImage(billboardLayer,0,0);
 }
 function asciiPass(){
   sc.imageSmoothingEnabled=true;sc.imageSmoothingQuality='high';sc.drawImage(world,0,0,cols,rows);
@@ -98,7 +110,7 @@ function draw(){
   const light=CityCalendar.lightAt(epoch),cars=CityTraffic.carsAt(time);const tCrowd=performance.now();
   for(const screen of screens){const state=adAt(screen.index,time),ad=ads[state.ad];if(ad.ready)screenAd(screen,ad,state,light)}
   updateScreenLights();CityEnvironment.paintBillboardGlow(ctx,light,screens,false,environment.skyMask);
-  for(const screen of screens){if(!screen.light)continue;ctx.save();path(screen.p);ctx.clip();project(screen);ctx.restore()}
+  paintBillboards();
   const tAds=performance.now();CityWeather.paintSurfaces(ctx,weather,light);CityEnvironment.paintBillboardGlow(ctx,light,screens,true,undefined,weather.wetness);CityEnvironment.paintWetScreens(ctx,light,screens,weather.wetness,project);for(const car of cars)CityTraffic.groundLights(ctx,car,light);
   const tGround=performance.now();const lamps=screens.map(s=>s.light).filter(Boolean),receiver=(p,h)=>CityEnvironment.receiverLight(light,p.x,p.y,h,lamps);
   const layers=[...cars.map(c=>({y:c.y,paint:(g=ctx)=>CityTraffic.paintCar(g,c,receiver(c,.8))})),...people.map(p=>({y:p.y,human:true,person:p})),...CityLife.furnitureLayers(weather,light).map(layer=>({y:layer.y,paint:(g=ctx)=>layer.paint(g)}))].sort((a,b)=>a.y-b.y);
