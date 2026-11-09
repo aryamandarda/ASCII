@@ -30,6 +30,7 @@ def prepare(destination):
     renderer = (source / 'fixed-screens.js').read_text()
     renderer = replace_once(renderer, "playing=!matchMedia('(prefers-reduced-motion: reduce)').matches", 'playing=true')
     renderer = replace_once(renderer, 'if(playing&&!document.hidden)', 'if(playing&&!document.hidden&&window.ASCII_SAVER_RUNNING!==false)')
+    renderer = replace_once(renderer, ".catch(()=>{el('loading').textContent='Please refresh'", ".catch(error=>{canvas.dataset.error=String(error);el('loading').textContent='Please refresh'")
     (destination / 'fixed-screens.js').write_text(renderer)
     # A blob worker avoids file:// cross-origin imports without WebKit private
     # preferences or a local HTTP server. Existing worker-failure fallback remains.

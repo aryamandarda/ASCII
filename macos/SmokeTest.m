@@ -4,13 +4,15 @@
 
 static BOOL done = NO;
 static int result = 1;
+static int polls = 0;
 static double firstEpoch = 0;
 static CFAbsoluteTime firstObserved = 0;
 
 static void poll(WKWebView *view) {
-    NSString *script = @"(()=>{const c=document.getElementById('art');return c&&c.dataset.frame?{frame:+c.dataset.frame,epoch:+c.dataset.epoch,speed:+c.dataset.speed,weather:c.dataset.weatherMode,people:+c.dataset.people,uiHidden:getComputedStyle(document.getElementById('likeWidget')).display==='none'&&getComputedStyle(document.getElementById('controls')).display==='none'&&getComputedStyle(document.getElementById('immerse')).display==='none'}:null})()";
+    NSString *script = @"(()=>{const c=document.getElementById('art');return c&&c.dataset.frame?{frame:+c.dataset.frame,epoch:+c.dataset.epoch,speed:+c.dataset.speed,weather:c.dataset.weatherMode,people:+c.dataset.people,uiHidden:getComputedStyle(document.getElementById('likeWidget')).display==='none'&&getComputedStyle(document.getElementById('controls')).display==='none'&&getComputedStyle(document.getElementById('immerse')).display==='none'}:{ready:document.readyState,error:c?.dataset.error||'',text:document.body?.innerText||'',hidden:document.hidden}})()";
     [view evaluateJavaScript:script completionHandler:^(id value, NSError *error) {
         if (done) return;
+        if (++polls % 10 == 0) NSLog(@"WebKit observation: %@ error: %@", value, error);
         if (!error && [value isKindOfClass:NSDictionary.class] && [value[@"frame"] intValue] > 2) {
             if ([value[@"speed"] intValue] != 1 || ![value[@"weather"] isEqual:@"natural"] || ![value[@"uiHidden"] boolValue]) {
                 NSLog(@"FAIL configuration: %@", value); done = YES; return;
@@ -27,7 +29,8 @@ int main(int argc, const char *argv[]) {
     @autoreleasepool {
         if (argc != 2) return 2;
         [NSApplication sharedApplication];
-        [NSApp setActivationPolicy:NSApplicationActivationPolicyAccessory];
+        [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
+        [NSApp finishLaunching];
         NSBundle *bundle = [NSBundle bundleWithPath:[[NSString stringWithUTF8String:argv[1]] stringByStandardizingPath]];
         Class principal = bundle.principalClass;
         if (!principal || ![principal isSubclassOfClass:ScreenSaverView.class]) { NSLog(@"FAIL loading saver bundle"); return 1; }
@@ -35,14 +38,17 @@ int main(int argc, const char *argv[]) {
         NSWindow *window = [[NSWindow alloc] initWithContentRect:frame styleMask:NSWindowStyleMaskBorderless backing:NSBackingStoreBuffered defer:NO];
         ScreenSaverView *saver = [[principal alloc] initWithFrame:frame isPreview:YES];
         window.contentView = saver;
-        [window orderFrontRegardless];
+        [window makeKeyAndOrderFront:nil];
+        [NSApp activate];
         [saver startAnimation];
         WKWebView *web = [saver valueForKey:@"webView"];
         if (!web) return 1;
         poll(web);
         NSDate *deadline = [NSDate dateWithTimeIntervalSinceNow:120];
         while (!done && deadline.timeIntervalSinceNow > 0) {
-            [NSRunLoop.currentRunLoop runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.1]];
+            NSEvent *event = [NSApp nextEventMatchingMask:NSEventMaskAny untilDate:[NSDate dateWithTimeIntervalSinceNow:0.1] inMode:NSDefaultRunLoopMode dequeue:YES];
+            if (event) [NSApp sendEvent:event];
+            [NSApp updateWindows];
         }
         [saver stopAnimation];
         if ([saver valueForKey:@"webView"] != nil) result = 1;
