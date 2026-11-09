@@ -37,6 +37,12 @@ On phones, Immerse keeps the full scene visible in both portrait and landscape a
 
 Speeds range from **0.5× to 5×**. At 1×, five simulated minutes pass in five seconds. People, traffic, billboards, and lighting follow the same clock. Reduced-motion preferences are respected.
 
+## Mac screensaver preview
+
+The native `.saver` wrapper packages this same scene for offline use on Apple Silicon and Intel Macs, with natural weather and continuous 1× playback. Each activation starts at the current date/time. Controls and likes are hidden.
+
+See [Mac installation and testing notes](macos/INSTALL.md) and [downloadable previews](https://github.com/aryamandarda/ASCII/releases). Builds are ad-hoc signed; Apple notarization and physical Screen Saver host testing are still pending. To build on a Mac with Xcode Command Line Tools, run `bash macos/build.sh`.
+
 ## Development
 
 The complete scene lives in [`dist/projects/ASCII/nyc/`](dist/projects/ASCII/nyc/). Its [artwork notes](dist/projects/ASCII/nyc/art-notes.md) describe the renderer and simulation. See [development and website integration](DEVELOPMENT.md) for running the artwork alongside the separate personal website.
