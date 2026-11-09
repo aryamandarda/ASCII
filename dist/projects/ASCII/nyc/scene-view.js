@@ -16,7 +16,7 @@
     document.body.classList.toggle('scene-fill',expanded);
     surface.dataset.viewMode=expanded?'cover':'contain';art.style.objectPosition=`${x*100}% ${y*100}%`;
     fit.hidden=!mobile.matches;fit.textContent=expanded?'Full scene':'Zoom in';fit.setAttribute('aria-pressed',String(expanded));
-    full.textContent=fullscreen()?'Exit fullscreen':'Fullscreen';full.hidden=standalone();
+    full.textContent=fullscreen()?'Exit fullscreen':'Fullscreen';full.hidden=mobile.matches||standalone();
     if(!expanded)hint.hidden=true;
     onResize();
   }

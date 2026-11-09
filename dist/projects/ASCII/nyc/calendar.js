@@ -29,10 +29,11 @@
     const day=smooth(-6,12,alt),warm=smooth(-7,-1,alt)*(1-smooth(3,13,alt)),sun=ms>=rise&&ms<=set,progress=clamp((ms-rise)/(set-rise),0,1);
     const lunar=SunCalc.getMoonIllumination(new Date(ms)),position=SunCalc.getMoonPosition(new Date(ms),lat,lon);
     // The disc exists above the real lunar horizon, including daytime moons.
-    // Position is artistically fitted into the photograph's visible sky opening.
+    // Fit the above-horizon path into the open sky above the central tower.
+    // The old y=590 path put most lunar positions inside the building mask.
     const moon=position.altitude>0&&lunar.fraction>.004;
     return{...p,day,night:1-day,warm,elevation:alt,sun,morning:ms<noon,x:365+progress*575,y:590-Math.sin(progress*Math.PI)*495,
-      moon,moonX:640+Math.sin(position.azimuth)*265,moonY:590-clamp(position.altitude/(Math.PI/2),0,1)*530,
+      moon,moonX:650+Math.sin(position.azimuth)*150,moonY:200-clamp(position.altitude/(Math.PI/2),0,1)*145,
       moonPhase:lunar.phase,moonFraction:lunar.fraction,moonAngle:lunar.angle-position.parallacticAngle,moonAltitude:position.altitude,sunrise:rise,sunset:set};
   }
   function advance(epoch,seconds,speed=1,direction=1){return epoch+seconds*MINUTE*speed*direction}

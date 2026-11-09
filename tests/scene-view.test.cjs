@@ -11,9 +11,9 @@ console.log('PASS: portrait/landscape fit and cover, bounded panning, aspect rat
  const context={innerWidth:390,innerHeight:700,navigator:{},URL,clearTimeout(){},setTimeout(){return 1},document:{body:{classList:{toggle(){}}},getElementById:id=>elements[id],addEventListener(){}}};
  context.window=context;context.addEventListener=(type,fn)=>listeners[type]=fn;context.matchMedia=query=>({get matches(){return query.includes('max-width')&&(context.innerWidth<=600||context.innerWidth<=1000&&context.innerHeight<=600)}});
  vm.runInNewContext(fs.readFileSync('dist/projects/ASCII/nyc/scene-view.js','utf8'),context);
- let shown;context.SceneView.enter(()=>{},show=>shown=show);assert.equal(shown,false);assert.equal(context.SceneView.mode(),'contain');
+ let shown;context.SceneView.enter(()=>{},show=>shown=show);assert.equal(shown,false);assert.equal(elements.viewFullscreen.hidden,true);assert.equal(context.SceneView.mode(),'contain');
  elements.viewFit.onclick();assert.equal(context.SceneView.mode(),'cover');
- context.innerWidth=844;context.innerHeight=330;listeners.resize();assert.equal(context.SceneView.mode(),'contain','Rotation restores the complete scene');assert.equal(elements.viewFit.textContent,'Zoom in');
+ context.innerWidth=844;context.innerHeight=330;listeners.resize();assert.equal(context.SceneView.mode(),'contain','Rotation restores the complete scene');assert.equal(elements.viewFit.textContent,'Zoom in');assert.equal(elements.viewFullscreen.hidden,true);
  elements.viewFit.onclick();assert.equal(context.SceneView.mode(),'cover');context.SceneView.leave();assert.equal(context.SceneView.mode(),'contain');assert.equal(elements.viewHint.hidden,true);
- context.innerWidth=1440;context.innerHeight=900;listeners.resize();context.SceneView.enter(()=>{},show=>shown=show);assert.equal(shown,true);assert.equal(elements.viewFit.hidden,true);assert.equal(context.SceneView.compact(),false);
+ context.innerWidth=1440;context.innerHeight=900;listeners.resize();context.SceneView.enter(()=>{},show=>shown=show);assert.equal(shown,true);assert.equal(elements.viewFit.hidden,true);assert.equal(context.SceneView.compact(),false);assert.equal(elements.viewFullscreen.hidden,false);
 }
