@@ -20,12 +20,14 @@ static void poll(WKWebView *view) {
                 NSLog(@"FAIL configuration: %@", value); done = YES; return;
             }
             if (!firstEpoch) { firstEpoch = [value[@"epoch"] doubleValue]; firstObserved = CFAbsoluteTimeGetCurrent(); }
-            NSImageView *nativeView = [testedSaver valueForKey:@"frameView"];
-            NSBitmapImageRep *pixels = [[NSBitmapImageRep alloc] initWithData:nativeView.image.TIFFRepresentation];
+            NSBitmapImageRep *pixels = [testedSaver bitmapImageRepForCachingDisplayInRect:testedSaver.bounds];
+            [testedSaver cacheDisplayInRect:testedSaver.bounds toBitmapImageRep:pixels];
             BOOL colored = NO;
             for (NSInteger y=0; y<pixels.pixelsHigh; y+=32) for (NSInteger x=0; x<pixels.pixelsWide; x+=32) {
                 NSColor *color = [[pixels colorAtX:x y:y] colorUsingColorSpace:NSColorSpace.deviceRGBColorSpace];
-                if (color.redComponent + color.greenComponent + color.blueComponent > .5) colored = YES;
+                CGFloat high = MAX(color.redComponent, MAX(color.greenComponent, color.blueComponent));
+                CGFloat low = MIN(color.redComponent, MIN(color.greenComponent, color.blueComponent));
+                if (high - low > .15 && high > .3) colored = YES;
             }
             if (CFAbsoluteTimeGetCurrent() - firstObserved >= 20 && [value[@"epoch"] doubleValue] > firstEpoch + 30000 && [[testedSaver valueForKey:@"presentedFrames"] intValue] > 5 && colored) {
                 NSLog(@"PASS offline WebKit animation: %@", value); result = 0; done = YES; return;
@@ -55,7 +57,7 @@ int main(int argc, const char *argv[]) {
         if (!web) return 1;
         // Model the failure mode: the visible output must not depend on WebKit's
         // composited layer or its background requestAnimationFrame scheduler.
-        web.alphaValue = 0;
+        if (web.alphaValue != 0) { NSLog(@"FAIL: production WebKit surface is visible"); return 1; }
         poll(web);
         NSDate *deadline = [NSDate dateWithTimeIntervalSinceNow:120];
         while (!done && deadline.timeIntervalSinceNow > 0) {

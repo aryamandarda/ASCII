@@ -1,5 +1,7 @@
 Offline Times Square screensaver for Apple Silicon and Intel Macs.
 
+Version 1.0.2 suppresses WebKit's backing surface in the shipped wrapper, matching the native-frame test. The test now samples the composed screen saver view and rejects all-white as well as all-black output; it no longer changes the wrapper's visibility configuration.
+
 This preview renders live frames into a native Mac image view to avoid depending on WebKit's visible layer in the legacy screen saver host. It also adds picker thumbnails, bundled installation instructions, and readable loading failures. A 20-second native-frame smoke test runs with the web view invisible. Actual Tahoe screen saver host compatibility still needs confirmation; this is a workaround candidate.
 
 Natural seasonal weather and continuous 1× time progression. No controls or like button. The scene starts at the current date and time on each activation, then advances one simulated minute per second.

@@ -47,6 +47,10 @@
     WKWebView *view = [[WKWebView alloc] initWithFrame:self.bounds configuration:configuration];
     view.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
     view.navigationDelegate = self;
+    // Match the tested configuration: never expose WebKit's backing surface.
+    // Placing it below NSImageView does not suppress its remote compositing layer
+    // in the legacy screen saver host.
+    view.alphaValue = 0;
     self.webView = view;
     // WebKit supplies pixels, not the visible layer. Tahoe's legacy screen saver
     // host can stop compositing a WKWebView even while JavaScript keeps running.
