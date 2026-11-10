@@ -74,7 +74,7 @@ flowchart LR
     F --> G[Visible character canvas]
 ```
 
-The renderer uses a 1280 × 854 scene, perspective-mapped billboards, a 512-color palette, ordered dithering, and cached glyph pixels. A separate pedestrian mask preserves clothing colors through the character pass. Unchanged character cells reuse their previous pixels.
+The renderer uses a 1280 × 854 scene, perspective-mapped billboards, a 512-color palette, ordered dithering, and cached glyph pixels. A separate pedestrian mask preserves clothing colors through the character pass. Glyph textures are cached and reused across frames.
 
 | Read more | What it covers |
 | --- | --- |
