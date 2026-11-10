@@ -44,7 +44,7 @@ Each pedestrian’s geometry, lighting, and material colors are calculated once.
 
 ## 6. Convert the finished scene into characters
 
-[`character-grid.js`](../web/artworks/nyc/character-grid.js) and [`renderer.js`](../web/artworks/nyc/renderer.js) implement the final pass:
+[`character-grid.js`](../web/artworks/nyc/character-grid.js), [`character-gpu.js`](../web/artworks/nyc/character-gpu.js), and [`renderer.js`](../web/artworks/nyc/renderer.js) implement the final pass:
 
 1. Choose a character grid appropriate to the viewport. Rows follow `round(columns × 854 / 1280 × 0.6)` to account for the glyph aspect ratio.
 2. Downsample the composed scene and pedestrian mask to one sample per character cell.
@@ -54,7 +54,9 @@ Each pedestrian’s geometry, lighting, and material colors are calculated once.
 
 The desktop glyph atlas uses **6 × 10** cells with bold 10 px monospace characters. A compact **3 × 5** atlas is prepared by downsampling for artwork views narrower than 1920 CSS pixels. The character count stays the same; larger views retain the **6 × 10** output. The canvas is then fitted to the display while preserving the scene's aspect ratio.
 
-The renderer keeps the previous encoded value for each cell. If color, glyph, and pedestrian-mask state are unchanged, its pixels are left alone. Changed cells are copied through `Uint32Array` views into a reusable image buffer; `putImageData` updates the bounding range of changed rows. This avoids issuing hundreds of thousands of individual glyph drawing calls per frame, although sampling and comparison still visit the full grid.
+The preferred path uploads the sampled scene and mask as WebGL textures. A fragment shader applies the same color cube, Bayer pattern, luminance thresholds, and pedestrian-mask cutoff, then samples the cached glyph textures. This removes per-frame `getImageData` readbacks and JavaScript pixel expansion. Integer-weighted luminance keeps threshold selection consistent between the CPU and GPU. The WebGL canvas is copied immediately into the visible Canvas 2D surface.
+
+If WebGL is unavailable or its context is lost, the renderer uses the original CPU path. It keeps the previous encoded value for each cell and copies changed glyphs through `Uint32Array` views into a reusable image buffer; `putImageData` updates the bounding range of changed rows. Context restoration recreates the shader and atlas textures. Both paths preserve the character count, palette, and clothing treatment.
 
 ## 7. Preserve color without clothing stripes
 
@@ -68,8 +70,8 @@ The pedestrian mask selects the corresponding atlas when its sampled alpha excee
 
 The first visible frame waits for both the assets and a valid crowd state. During date jumps, it holds the last complete scene until the worker catches up.
 
-The browser requests animation frames but caps scene draws at **24 fps**, and pauses normal playback while the document is hidden. A cap is not a guarantee: frame time depends on viewport detail, device, crowd, weather, and browser.
+The browser requests animation frames and targets **30 fps**, which divides evenly into 60 Hz and 120 Hz display refresh rates. It pauses normal playback while the document is hidden. A target is not a guarantee: frame time depends on viewport detail, device, crowd, weather, and browser.
 
-The largest work happens in scene composition, canvas readback, character sampling, and pixel copying. Reused canvases, glyph atlases, dirty-cell comparisons, and worker-based crowd calculations reduce repeated work. Motion sheets remove runtime video decoding but consume decoded image memory. Adaptive character density balances detail against the cost of the output buffer.
+The largest remaining work is scene composition, especially articulated pedestrians and billboard updates. Reused canvases, glyph atlases, cached billboard projections, and worker-based crowd calculations reduce repeated work. Motion sheets remove runtime video decoding but consume decoded image memory. The crowd worker calculates 12 simulated minutes per batch and retains at most 16 batches and 32 checkpoints, bounding both boundary stalls and retained history. Time-slider input settles for 140 ms or commits immediately on release, so dragging does not queue expensive intermediate scenes.
 
-For inspection, the visible `#art` canvas exposes `data-render-ms`, `data-render-stages`, `data-columns`, `data-glyph-width`, and `data-frame`. Stage timings separate the environment, crowd, advertising, ground, actors, precipitation, and character pass. These are diagnostics, not claims of a particular frame rate on every machine.
+For inspection, the visible `#art` canvas exposes `data-render-ms`, `data-render-stages`, `data-columns`, `data-glyph-width`, `data-ascii-mode` (`gpu` or `cpu`), and `data-frame`. Stage timings separate the environment, crowd, advertising, ground, actors, precipitation, and character pass. GPU submission timings do not measure completed GPU execution; use delivered frames as well. These are diagnostics, not claims of a particular frame rate on every machine.

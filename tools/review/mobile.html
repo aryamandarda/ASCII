@@ -1,4 +1,4 @@
-<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1"><title>Phone configuration review</title><style>body{background:#161b24;color:white;font:13px system-ui;margin:12px}button{padding:8px;margin:2px}iframe{display:block;border:1px solid #555;width:390px;height:700px;margin-top:8px}output{display:block;margin:6px}</style><nav><button data-w="320" data-h="568">Small portrait</button><button data-w="375" data-h="667">Standard portrait</button><button data-w="390" data-h="700">iPhone browser</button><button data-w="430" data-h="820">Large portrait</button><button data-w="568" data-h="320">Small landscape</button><button data-w="667" data-h="375">Standard landscape</button><button data-w="844" data-h="330">iPhone landscape</button><button data-w="932" data-h="430">Large landscape</button><button data-w="390" data-h="844" data-safe="1">Standalone portrait</button><button data-w="844" data-h="390" data-safe="1">Notched landscape</button></nav><output id="size">390 × 700</output><iframe id="scene" src="/artworks/nyc/"></iframe><script>const scene=document.querySelector('#scene');document.querySelectorAll('button').forEach(b=>b.onclick=()=>{scene.style.width=b.dataset.w+'px';scene.style.height=b.dataset.h+'px';const s=scene.contentDocument.documentElement.style;const wide=+b.dataset.w>+b.dataset.h;for(const [key,val]of Object.entries({top:b.dataset.safe&&!wide?47:0,bottom:b.dataset.safe?wide?21:34:0,left:b.dataset.safe&&wide?47:0,right:b.dataset.safe&&wide?47:0}))s.setProperty('--safe-'+key,val+'px');document.querySelector('#size').textContent=b.dataset.w+' × '+b.dataset.h});</script>
+<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Phone configuration review</title><style>body{background:#161b24;color:white;font:13px system-ui;margin:12px}button{padding:8px;margin:2px}iframe{display:block;border:1px solid #555;width:390px;height:700px;margin-top:8px}output{display:block;margin:6px}</style><nav><button data-w="320" data-h="568">Small portrait</button><button data-w="375" data-h="667">Standard portrait</button><button data-w="390" data-h="700">iPhone browser</button><button data-w="430" data-h="820">Large portrait</button><button data-w="568" data-h="320">Small landscape</button><button data-w="667" data-h="375">Standard landscape</button><button data-w="844" data-h="330">iPhone landscape</button><button data-w="932" data-h="430">Large landscape</button><button data-w="390" data-h="844" data-safe="1">Standalone portrait</button><button data-w="844" data-h="390" data-safe="1">Notched landscape</button></nav><output id="size">390 × 700</output><iframe id="scene" src="/artworks/nyc/"></iframe><script>const scene=document.querySelector('#scene');document.querySelectorAll('button').forEach(b=>b.onclick=()=>{scene.style.width=b.dataset.w+'px';scene.style.height=b.dataset.h+'px';const s=scene.contentDocument.documentElement.style;const wide=+b.dataset.w>+b.dataset.h;for(const [key,val]of Object.entries({top:b.dataset.safe&&!wide?47:0,bottom:b.dataset.safe?wide?21:34:0,left:b.dataset.safe&&wide?47:0,right:b.dataset.safe&&wide?47:0}))s.setProperty('--safe-'+key,val+'px');document.querySelector('#size').textContent=b.dataset.w+' × '+b.dataset.h});</script>
 <button id="run">Run layout checks</button><pre id="results" aria-live="polite"></pre>
 <script>
 const settle=()=>new Promise(resolve=>setTimeout(()=>requestAnimationFrame(()=>requestAnimationFrame(resolve)),150));
@@ -7,7 +7,9 @@ document.querySelector('#run').onclick=async()=>{
  try{
   const doc=scene.contentDocument,el=id=>doc.getElementById(id),records=[];
   if(el('immerse').disabled)throw Error('Wait for the scene to load first');
-  if(!doc.body.classList.contains('immersed'))el('immerse').click();
+  // Keep viewport-size checks inside the iframe; fullscreen is checked separately.
+   doc.defaultView.SceneView.requestFullscreen=()=>{};
+   if(!doc.body.classList.contains('immersed'))el('immerse').click();
   if(el('play').getAttribute('aria-label')==='Pause animation')el('play').click();
   for(const preset of document.querySelectorAll('nav button')){
    preset.click();await settle();
@@ -15,6 +17,7 @@ document.querySelector('#run').onclick=async()=>{
    if(el('weatherOptions').hidden)el('weather').click();
    await settle();
    const w=scene.clientWidth,h=scene.clientHeight,box=id=>el(id).getBoundingClientRect(),inside=id=>{const r=box(id);return r.x>=-.5&&r.y>=-.5&&r.right<=w+.5&&r.bottom<=h+.5};
+   if(w!==+preset.dataset.w||h!==+preset.dataset.h)throw Error(preset.textContent+': unexpected viewport '+w+'×'+h);
    for(const id of ['likeWidget','leave','controlsToggle','controls'])if(!inside(id))throw Error(preset.textContent+': '+id+' clipped');
    const a=box('art'),s=box('surface');
    if(Math.abs(a.width-s.width)>1||Math.abs(a.height-s.height)>1||el('surface').dataset.viewMode!=='contain')throw Error(preset.textContent+': scene clipped');

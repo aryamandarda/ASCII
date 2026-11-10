@@ -1,0 +1,57 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Character GPU regression checks</title>
+<style>body{background:#111;color:#eee;font:14px monospace}pre{white-space:pre-wrap}</style>
+<pre id="results">Checking GPU color, glyph, mask, and pixel orientation…</pre>
+<script src="/artworks/nyc/character-grid.js"></script>
+<script src="/artworks/nyc/character-gpu.js"></script>
+<script>
+const report=document.querySelector('#results');
+function surface(w,h){const c=document.createElement('canvas');c.width=w;c.height=h;return c}
+function atlas(w,h,human){
+  const c=surface(512*w,8*h),g=c.getContext('2d'),image=g.createImageData(c.width,c.height);
+  for(let y=0;y<c.height;y++)for(let x=0;x<c.width;x++){
+    const n=Math.floor(x/w)*8+Math.floor(y/h),i=(y*c.width+x)*4;
+    image.data.set([n&255,n>>8,x%w+(y%h)*w+(human?128:0),255],i);
+  }
+  g.putImageData(image,0,0);return c;
+}
+try{
+  const gpu=CharacterGPU.create();if(!gpu)throw Error('WebGL unavailable; use the Canvas 2D fallback');
+  const cols=128,rows=128,scene=surface(cols,rows),mask=surface(cols,rows),s=scene.getContext('2d'),m=mask.getContext('2d');
+  const pixels=s.createImageData(cols,rows),coverage=m.createImageData(cols,rows);let seed=12345;
+  const random=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed>>>24};
+  for(let i=0;i<cols*rows;i++){
+    const gray=i<256?i:null;
+    pixels.data.set([gray??random(),gray??random(),gray??random(),255],i*4);
+    coverage.data.set([255,255,255,i%2?181:180],i*4);
+  }
+  s.putImageData(pixels,0,0);m.putImageData(coverage,0,0);
+  let output;
+  for(const [w,h] of [[3,5],[6,10]]){
+    gpu.setAtlases(atlas(w,h,false),atlas(w,h,true));
+    output=gpu.render(scene,mask,cols,rows,cols*w,rows*h);
+    if(!output)throw Error('GPU rendering failed');
+    const copy=surface(output.width,output.height),g=copy.getContext('2d',{willReadFrequently:true});g.drawImage(output,0,0);
+    const result=g.getImageData(0,0,copy.width,copy.height).data;let mismatches=0,first;
+    for(let y=0;y<copy.height;y++)for(let x=0;x<copy.width;x++){
+      const cx=Math.floor(x/w),cy=Math.floor(y/h),index=cy*cols+cx,k=index*4,i=(y*copy.width+x)*4;
+      const n=CharacterGrid.code(pixels.data[k],pixels.data[k+1],pixels.data[k+2],cx,cy),expected=[n&255,n>>8,x%w+(y%h)*w+(index%2?128:0),255];
+      if(expected.some((v,c)=>v!==result[i+c])){mismatches++;first??={x,y,rgb:Array.from(pixels.data.slice(k,k+3)),expected,actual:Array.from(result.slice(i,i+4))}}
+    }
+    if(mismatches)throw Error(JSON.stringify({w,h,mismatches,first}));
+    report.textContent+='\nPASS '+w+'×'+h+': '+(cols*rows)+' colors, all Bayer positions, glyph pixels, orientation and both mask thresholds';
+  }
+  const gl=output.getContext('webgl'),loss=gl.getExtension('WEBGL_lose_context');
+  if(loss){
+    output.addEventListener('webglcontextlost',()=>{
+      if(gpu.render(scene,mask,cols,rows,cols*6,rows*10)!==null){report.textContent+='\nFAIL loss must select CPU fallback';return}
+      report.textContent+='\nPASS context loss selects CPU fallback';setTimeout(()=>loss.restoreContext(),100);
+    },{once:true});
+    output.addEventListener('webglcontextrestored',()=>{
+      report.textContent+='\n'+(gpu.render(scene,mask,cols,rows,cols*6,rows*10)?'PASS':'FAIL')+' context restoration restores the glyph atlases';
+    },{once:true});
+    loss.loseContext();
+  }
+}catch(error){report.textContent+='\nFAIL '+error.message}
+</script>

@@ -22,6 +22,8 @@ node --test tests/*.test.cjs
 
 The checks cover pedestrian separation, seating clearance, vehicle spacing, time reversal, New York daylight and calendar transitions, character rendering, perspective transforms, and the source video clips.
 
+For real-browser GPU checks, copy `tools/review/gpu.html` to `web/review/gpu.html` and open `/review/gpu.html` on the local server. It compares 16,384 sampled colors against the CPU character code at both glyph sizes, checks the mask cutoff and pixel orientation, and exercises context loss and restoration. `tools/review/mobile.html` provides portrait, landscape, and safe-area layout checks in the same way. The `web/review/` directory is excluded from production assets.
+
 ## Local visual review before a pull request
 
 Build a standalone, offline review file:

@@ -117,7 +117,9 @@
     }
     return groundPath(planned);
   }
-  const STEP=.125,BLOCK=120,WARMUP=360,blocks=new Map(),checkpoints=new Map();
+  // Small chunks avoid a long worker stall at each boundary and bound the
+  // retained history to 192 simulated minutes instead of 1,920.
+  const STEP=.125,BLOCK=12,WARMUP=360,blocks=new Map(),checkpoints=new Map();
   const copyAgent=a=>({...a,pos:[...a.pos]});
   const snapshot=a=>({definition:a.definition,pos:[...a.pos],vx:a.vx,vz:a.vz,travelled:a.travelled,heading:a.heading,locomotion:a.locomotion,sitting:a.sitting,waypoint:a.waypoint,route:a.route});
   function buildBlock(key){
@@ -206,6 +208,7 @@
       if(t>=start)frames.push(agents.map(snapshot));
     }
     checkpoints.set(key+1,save());
+    while(checkpoints.size>32)checkpoints.delete(checkpoints.keys().next().value);
     const block={start,frames};blocks.set(key,block);if(blocks.size>16)blocks.delete(blocks.keys().next().value);return block;
   }
   function peopleAt(time){

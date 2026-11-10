@@ -18,8 +18,8 @@ class ImageMock {constructor(){this.naturalWidth=240;this.naturalHeight=360;imag
 const elements={art:canvas(),ambient:canvas()};function element(id){return elements[id]||(elements[id]={style:{setProperty(){}},attributes:{},clientWidth:390,clientHeight:844,setAttribute(k,v){this.attributes[k]=v},removeAttribute(){},focus(){}})}
 const win={};vm.runInNewContext(fs.readFileSync('web/artworks/nyc/motion-manifest.js','utf8'),{window:win});
 const weather=require('../web/artworks/nyc/weather.js'),environment=require('../web/artworks/nyc/environment.js');
-let crowdReady=false;
-const sandbox={CityCrowd:{create:()=>({isReady:()=>crowdReady,peopleAt:t=>crowdReady?life.peopleAt(t):[],mode:()=>"test"})},CityWeather:{...weather,paintSurfaces(){},paintPrecipitation(){},paintFurnitureSnow(){}},BillboardModel:model,AdDirector:director,CharacterGrid:grid,CityLife:life,CityTraffic:traffic,CityCalendar,Intl,Date,MotionManifest:win.MotionManifest,CityEnvironment:{...environment,setPalette(){},palettes:{},paintBillboardGlow(){},billboardExposure:()=>.85,create(){return{render:hour=>({hour}),skyPixels:170000}}},Image:ImageMock,
+let crowdReady=false,crowdQueries=0;
+const sandbox={CityCrowd:{create:()=>({isReady:()=>crowdReady,peopleAt:t=>{crowdQueries++;return crowdReady?life.peopleAt(t):[]},mode:()=>"test"})},CityWeather:{...weather,paintSurfaces(){},paintPrecipitation(){},paintFurnitureSnow(){}},BillboardModel:model,AdDirector:director,CharacterGrid:grid,CityLife:life,CityTraffic:traffic,CityCalendar,Intl,Date,MotionManifest:win.MotionManifest,CityEnvironment:{...environment,setPalette(){},palettes:{},paintBillboardGlow(){},paintWetScreens(){},billboardExposure:()=>.85,create(){return{render:hour=>({hour}),skyPixels:170000}}},Image:ImageMock,
  document:{hidden:false,querySelectorAll(){return[]},getElementById:element,addEventListener(name,fn){listeners[name]=fn},createElement(tag){assert.equal(tag,'canvas','No hidden autoplay video dependency');return canvas()}},
  ResizeObserver:class{constructor(fn){resizeCallback=fn}observe(){}},
  matchMedia:()=>({matches:false}),performance:{now:()=>0},requestAnimationFrame(fn){nextFrame=fn},setTimeout(fn){fn()},clearTimeout(){}};
@@ -62,5 +62,16 @@ const sandbox={CityCrowd:{create:()=>({isReady:()=>crowdReady,peopleAt:t=>crowdR
  listeners.keydown({key:'h',code:'KeyH',preventDefault(){}});assert(elements.controls.hidden,'H works after clicking a button');
  listeners.keydown({key:'H',code:'KeyH',preventDefault(){}});assert(!elements.controls.hidden,'H restores controls');
  sandbox.document.activeElement={tagName:'INPUT'};listeners.keydown({key:'h',code:'KeyH',preventDefault(){}});assert(!elements.controls.hidden,'Do not toggle while editing');
+ // Continuous touch input updates the clock immediately but sends only the
+ // settled time to the crowd, keeping the old complete frame during the drag.
+ let pendingSeek;
+ sandbox.setTimeout=fn=>{pendingSeek=fn;return 1};sandbox.clearTimeout=()=>{pendingSeek=null};
+ const beforeSeek=out.dataset.frame,queriesBefore=crowdQueries;
+ for(const minute of [120,400,740,1020]){elements.time.value=String(minute);elements.time.oninput()}
+ nextFrame(5000);
+ assert.equal(out.dataset.frame,beforeSeek);assert.equal(crowdQueries,queriesBefore,'A drag does not queue intermediate crowd rebuilds');
+ assert.equal(elements.timeValue.textContent,'5:00 PM');assert(pendingSeek);
+ elements.time.onchange();
+ assert.equal(crowdQueries,queriesBefore+1);assert.equal(pendingSeek,null);assert.equal(+out.dataset.hour,17);
  console.log('PASS: startup without user gesture; frame sequences; pause/resume; responsive rendering and hide/show controls; hourly crowd, exact clock, reverse and calendar rollover; ten creatives and grouped takeovers.');
 })().catch(e=>{console.error(e);process.exitCode=1});

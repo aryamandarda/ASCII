@@ -31,7 +31,7 @@ A photograph provides the architecture; a layered Canvas 2D simulation brings th
 - **Animated billboards** — ten creatives, perspective-mapped screens, and coordinated campaign takeovers.
 - **An explorable clock** — choose a date, pause, reverse time, or change the playback speed and weather.
 
-Built with **vanilla JavaScript and Canvas 2D**. No frontend framework or compilation step. The scene runs locally; a small Cloudflare Worker and Durable Object provide the shared like counter.
+Built with **vanilla JavaScript, Canvas 2D, and WebGL**. No frontend framework or compilation step. Canvas 2D composes the scene; WebGL converts it into characters, with a Canvas 2D fallback. The scene runs locally; a small Cloudflare Worker and Durable Object provide the shared like counter.
 
 ## Explore Times Square
 
